@@ -6,6 +6,6 @@ python /ukp-storage-1/tran/DAMO-ConvAI/acl23doc2dial/train_retrieval.py &&\
 echo "train_retrieval finished..." &&\
 python /ukp-storage-1/tran/DAMO-ConvAI/acl23doc2dial/train_rerank.py &&\
 echo "train_rerank finished..." &&\
-python /ukp-storage-1/tran/DAMO-ConvAI/acl23doc2dial/train_generation.py &&\
+python /ukp-storage-1/tran/DAMO-ConvAI/acl23doc2dial/train_generation.py @args.txt &&\
 echo "train_generation finished..." &&\
 popd
