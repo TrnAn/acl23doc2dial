@@ -20,6 +20,9 @@ from modelscope.trainers.nlp.document_grounded_dialog_generate_trainer import \
     DocumentGroundedDialogGenerateTrainer
 from modelscope.utils.constant import DownloadMode
 from modelscope.utils.logger import get_logger
+from sklearn.model_selection import train_test_split
+import argparse, sys
+
 
 logger = get_logger()
 
@@ -286,7 +289,26 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
     return meters
 
 
-if __name__ == '__main__':
+
+def main():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= False)
+    parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
+    parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
+    args = parser.parse_args()
+    
+    # read in English + Chinese dataset
+    en_train_dataset, cn_train_dataset = [], []
+    if args.use_extended_dataset:
+        cn_train_dataset = MsDataset.load(
+            'DAMO_ConvAI/ZhDoc2BotDialogue',
+            download_mode=DownloadMode.FORCE_REDOWNLOAD)
+        en_train_dataset = MsDataset.load(
+            'DAMO_ConvAI/EnDoc2BotDialogue',
+            download_mode=DownloadMode.FORCE_REDOWNLOAD)
+
+    # read in Vietnamese + French dataset
     fr_train_dataset = MsDataset.load(
         'DAMO_ConvAI/FrDoc2BotGeneration',
         download_mode=DownloadMode.FORCE_REDOWNLOAD)
@@ -294,18 +316,35 @@ if __name__ == '__main__':
         'DAMO_ConvAI/ViDoc2BotGeneration',
         download_mode=DownloadMode.FORCE_REDOWNLOAD)
 
-    train_dataset = [x for dataset in [fr_train_dataset, vi_train_dataset] for x in dataset]
+    # read in English + Chinese dataset
+    dev_split = lambda x : ([],[]) if len(list(x)) == 0 else train_test_split(list(x), test_size=args.test_size)
+
+    # train_dataset   = [x for dataset in [fr_train_dataset, vi_train_dataset] for x in dataset]
+    train_dataset_vn, dev_dataset_vn = dev_split(vi_train_dataset)
+    train_dataset_fr, dev_dataset_fr = dev_split(fr_train_dataset)
+
+    train_dataset_en, dev_dataset_en = dev_split(en_train_dataset) 
+    train_dataset_cn, dev_dataset_cn = dev_split(cn_train_dataset)
+
+    train_dataset   = train_dataset_fr + train_dataset_vn + train_dataset_en + train_dataset_cn
+    dev_dataset     = dev_dataset_fr + dev_dataset_vn + dev_dataset_en + dev_dataset_cn
+
+    print(len(train_dataset))
 
     with open('all_passages/id_to_passage.json') as f:
         id_to_passage = json.load(f)
 
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir='./')
     trainer = DocumentGroundedDialogGenerateTrainer(
-        model=cache_path,
-        train_dataset=train_dataset,
-        eval_dataset=train_dataset[:100],
+        model           =   cache_path,
+        train_dataset   =   train_dataset,
+        eval_dataset    =   dev_dataset # train_dataset[:100],
     )
 
     train(trainer, batch_size=16, accumulation_steps=1, total_epoches=10, learning_rate=1e-4)
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
+
+
+if __name__ == '__main__':
+    main()
