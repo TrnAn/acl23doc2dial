@@ -2,10 +2,19 @@ from modelscope.msdatasets import MsDataset
 from modelscope.trainers.nlp.document_grounded_dialog_rerank_trainer import \
     DocumentGroundedDialogRerankTrainer
 from modelscope.utils.constant import DownloadMode
-
+import utils.preprocessing as preprocessing
+import argparse
 
 def main():
-    args = {
+    parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
+
+    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= True)
+    parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
+    parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
+    parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
+    args = vars(parser.parse_args())
+
+    args.update({
         'device': 'gpu',
         'tokenizer_name': '',
         'cache_dir': '',
@@ -43,7 +52,8 @@ def main():
         'local_rank': -1,
         'tokenizer_resize': True,
         'model_resize': True
-    }
+    })
+
     args[
         'gradient_accumulation_steps'] = args['full_train_batch_size'] // (
             args['per_gpu_train_batch_size'] * args['world_size'])

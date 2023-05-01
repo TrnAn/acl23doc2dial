@@ -7,11 +7,11 @@ import json
 import sacrebleu
 import torch
 import tqdm
+import pandas as pd
 from rouge import Rouge
 from torch.utils.data import DataLoader
 from transformers import AdamW, get_scheduler
 import transformers
-
 transformers.logging.set_verbosity_error()
 
 from modelscope.hub.snapshot_download import snapshot_download
@@ -22,7 +22,13 @@ from modelscope.utils.constant import DownloadMode
 from modelscope.utils.logger import get_logger
 from sklearn.model_selection import train_test_split
 import argparse, sys
-
+import matplotlib
+import matplotlib.pyplot as plt
+import seaborn as sns
+import utils.preprocessing as preprocessing
+import utils.data_exploration as exploration
+sns.set(style='whitegrid')
+sns.set_palette('pastel')
 
 logger = get_logger()
 
@@ -289,47 +295,47 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
     return meters
 
 
-
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
 
-    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= False)
+    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= True)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
+    parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
     args = parser.parse_args()
     
     # read in English + Chinese dataset
     en_train_dataset, cn_train_dataset = [], []
     if args.use_extended_dataset:
-        cn_train_dataset = MsDataset.load(
-            'DAMO_ConvAI/ZhDoc2BotDialogue',
-            download_mode=DownloadMode.FORCE_REDOWNLOAD)
-        en_train_dataset = MsDataset.load(
-            'DAMO_ConvAI/EnDoc2BotDialogue',
-            download_mode=DownloadMode.FORCE_REDOWNLOAD)
+        cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
+        en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
 
     # read in Vietnamese + French dataset
-    fr_train_dataset = MsDataset.load(
-        'DAMO_ConvAI/FrDoc2BotGeneration',
-        download_mode=DownloadMode.FORCE_REDOWNLOAD)
-    vi_train_dataset = MsDataset.load(
-        'DAMO_ConvAI/ViDoc2BotGeneration',
-        download_mode=DownloadMode.FORCE_REDOWNLOAD)
+    fr_train_dataset = preprocessing.read('DAMO_ConvAI/FrDoc2BotGeneration')
+    vi_train_dataset = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')
 
-    # read in English + Chinese dataset
-    dev_split = lambda x : ([],[]) if len(list(x)) == 0 else train_test_split(list(x), test_size=args.test_size)
+    train_dataset_vn, dev_dataset_vn = preprocessing.test_split(vi_train_dataset)
+    train_dataset_fr, dev_dataset_fr = preprocessing.test_split(fr_train_dataset)
 
-    # train_dataset   = [x for dataset in [fr_train_dataset, vi_train_dataset] for x in dataset]
-    train_dataset_vn, dev_dataset_vn = dev_split(vi_train_dataset)
-    train_dataset_fr, dev_dataset_fr = dev_split(fr_train_dataset)
+    train_dataset_en, dev_dataset_en = preprocessing.test_split(en_train_dataset) 
+    train_dataset_cn, dev_dataset_cn = preprocessing.test_split(cn_train_dataset)
 
-    train_dataset_en, dev_dataset_en = dev_split(en_train_dataset) 
-    train_dataset_cn, dev_dataset_cn = dev_split(cn_train_dataset)
+    if args.use_lang_token:
+        tmp_fr      = preprocessing.add_lang_token(train_dataset_fr, "fr", ["query", "rerank"]) 
+        tmp_vn      = preprocessing.add_lang_token(train_dataset_vn, "vn", ["query", "rerank"]) 
+        tmp_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "rerank"]) 
+        tmp_cn      = preprocessing.add_lang_token(train_dataset_cn, "cn", ["query", "rerank"]) 
+        train_df    = pd.concat([tmp_fr, tmp_vn, tmp_en, tmp_cn])
 
-    train_dataset   = train_dataset_fr + train_dataset_vn + train_dataset_en + train_dataset_cn
-    dev_dataset     = dev_dataset_fr + dev_dataset_vn + dev_dataset_en + dev_dataset_cn
+        tmp_fr = preprocessing.add_lang_token(dev_dataset_fr, "fr", ["query", "rerank"]) 
+        tmp_vn = preprocessing.add_lang_token(dev_dataset_vn, "vn", ["query", "rerank"]) 
+        tmp_en = preprocessing.add_lang_token(dev_dataset_en, "en", ["query", "rerank"]) 
+        tmp_cn = preprocessing.add_lang_token(dev_dataset_cn, "cn", ["query", "rerank"]) 
+        dev_df = pd.concat([tmp_fr, tmp_vn, tmp_en, tmp_cn])
 
-    print(len(train_dataset))
+
+    freq_df = exploration.get_freq_df(train_df, dev_df)
+    exploration.plot_freq(freq_df)
 
     with open('all_passages/id_to_passage.json') as f:
         id_to_passage = json.load(f)
@@ -337,8 +343,9 @@ def main():
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir='./')
     trainer = DocumentGroundedDialogGenerateTrainer(
         model           =   cache_path,
-        train_dataset   =   train_dataset,
-        eval_dataset    =   dev_dataset # train_dataset[:100],
+        train_dataset   =   train_df.to_dict('records'), # train_dataset,
+        eval_dataset    =   dev_df.to_dict('records'), # train_dataset[:100],
+        use_lang_token  =   args.use_lang_token
     )
 
     train(trainer, batch_size=16, accumulation_steps=1, total_epoches=10, learning_rate=1e-4)
