@@ -298,7 +298,7 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
 
-    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= True)
+    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= False)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
     parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
@@ -323,8 +323,8 @@ def main():
     if args.use_lang_token:
         tmp_fr      = preprocessing.add_lang_token(train_dataset_fr, "fr", ["query", "rerank"]) 
         tmp_vn      = preprocessing.add_lang_token(train_dataset_vn, "vn", ["query", "rerank"]) 
-        tmp_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "rerank"]) 
-        tmp_cn      = preprocessing.add_lang_token(train_dataset_cn, "cn", ["query", "rerank"]) 
+        tmp_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "passages"]) 
+        tmp_cn      = preprocessing.add_lang_token(train_dataset_cn, "cn", ["query", "passages"]) 
         train_df    = pd.concat([tmp_fr, tmp_vn, tmp_en, tmp_cn])
 
         tmp_fr = preprocessing.add_lang_token(dev_dataset_fr, "fr", ["query", "rerank"]) 
