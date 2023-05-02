@@ -11,7 +11,7 @@ from modelscope.preprocessors.builder import PREPROCESSORS
 from modelscope.utils.config import Config
 from modelscope.utils.constant import Fields, ModeKeys, ModelFile
 from modelscope.utils.type_assert import type_assert
-
+from utils.preprocessing import LANG_TOKENS_DD
 
 @PREPROCESSORS.register_module(
     Fields.nlp, module_name=Preprocessors.document_grounded_dialog_generate)
@@ -42,6 +42,13 @@ class DocumentGroundedDialogGeneratePreprocessor(Preprocessor):
             os.path.join(self.model_dir, 'rerank'))
         self.generation_tokenizer = MT5Tokenizer.from_pretrained(
             os.path.join(self.model_dir, 'generation'))
+
+         # add special language tokens <lang> to tokenizer
+        if kwargs["use_lang_token"]:
+            self.rerank_tokenizer.add_tokens(LANG_TOKENS_DD.values())
+            self.generation_tokenizer.add_tokens(LANG_TOKENS_DD.values())
+
+        self.token_length = len(self.generation_tokenizer)
 
     @type_assert(object, Dict)
     def __call__(self,
