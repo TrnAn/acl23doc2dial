@@ -85,6 +85,7 @@ def resize_token_embeddings(model, new_token_size):
     Returns:
         modelscope.models.Model: model with resized token embeddings
     """
+
     embedding_layer = model.embeddings.word_embeddings
     old_num_tokens, old_embedding_dim = embedding_layer.weight.shape
 
