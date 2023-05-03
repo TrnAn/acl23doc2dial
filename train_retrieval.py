@@ -37,6 +37,7 @@ def main():
     for file_name in ['fr', 'vi']:
         with open(f'all_passages/{file_name}.json') as f:
             tmp = json.load(f)
+            
             if args.use_lang_token:
                 tmp = [f'{s} <{file_name}>' for s in tmp]
             

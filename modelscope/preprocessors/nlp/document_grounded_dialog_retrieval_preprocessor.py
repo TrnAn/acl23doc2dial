@@ -11,7 +11,7 @@ from modelscope.preprocessors.builder import PREPROCESSORS
 from modelscope.utils.config import Config
 from modelscope.utils.constant import Fields, ModeKeys, ModelFile
 from modelscope.utils.type_assert import type_assert
-
+from utils.preprocessing import LANG_TOKENS_DD
 
 @PREPROCESSORS.register_module(
     Fields.nlp, module_name=Preprocessors.document_grounded_dialog_retrieval)
@@ -35,7 +35,13 @@ class DocumentGroundedDialogRetrievalPreprocessor(Preprocessor):
         self.context_sequence_length = self.config['context_sequence_length']
         self.tokenizer = XLMRobertaTokenizer.from_pretrained(
             os.path.join(self.model_dir))
+        
+        if kwargs["use_lang_token"]:
+            self.tokenizer.add_tokens(LANG_TOKENS_DD.values())
 
+        self.token_length = len(self.tokenizer)
+
+        
     @type_assert(object, Dict)
     def __call__(self,
                  data: Dict[str, Any],
