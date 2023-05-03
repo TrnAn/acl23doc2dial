@@ -10,8 +10,9 @@
 #SBATCH --mem=64GB
 #SBATCH --gres=gpu:1
 
+nvidia-smi
 source /ukp-storage-1/tran/miniconda3/etc/profile.d/conda.sh
 conda activate acl23doc2dial
 module purge
 module load cuda
-bash /ukp-storage-1/tran/DAMO-ConvAI/acl23doc2dial/run.sh
+bash /ukp-storage-1/tran/acl23doc2dial/run.sh
