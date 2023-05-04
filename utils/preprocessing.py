@@ -80,7 +80,7 @@ def add_lang_token(dataset:Union[pd.DataFrame, list], lang_key:str, colnames:lis
     return dataset
 
 
-def save_to_json(df:pd.DataaFrame, export_cols:list, fname:str="dev.json", dir:str=""):
+def save_to_json(df:pd.DataFrame, export_cols:list, fname:str="dev.json", dir:str=""):
     dir = os.path.join(dir, fname)
 
     logger.info(f"save test set {fname}...")
