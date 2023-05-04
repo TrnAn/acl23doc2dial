@@ -47,8 +47,8 @@ def main():
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=args.cache_dir)
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
-        train_dataset=train_dataset,
-        eval_dataset=dev_dataset,
+        train_dataset=train_dataset.to_dict('records'),
+        eval_dataset=dev_dataset.to_dict('records'),
         all_passages=all_passages,
         use_lang_token=args.use_lang_token)
     trainer.train(
