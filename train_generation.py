@@ -338,10 +338,8 @@ def main():
     dev_df = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
     export_cols = ["query", "response", "lang"] if args.use_lang_token else ["query", "response"]
-    fname = "dev.json"
-    logger.info(f"save test set {fname}...")
-    dev_df[export_cols].to_json("dev.json", orient="records")
-
+    preprocessing.save_to_json(dev_df, export_cols)
+    
     freq_df = exploration.get_freq_df(train_df, dev_df)
     exploration.plot_freq(freq_df)
 
