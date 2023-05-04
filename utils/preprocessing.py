@@ -7,6 +7,8 @@ import pandas as pd
 from torch import nn 
 from typing import Union
 import json
+import os 
+
 logger = get_logger()
 
 LANG_TOKENS = {"fr": "<fr>",
@@ -76,6 +78,14 @@ def add_lang_token(dataset:Union[pd.DataFrame, list], lang_key:str, colnames:lis
     dataset[colnames] = dataset[colnames].apply(lambda x: concat_special_token(x)).astype("str")
 
     return dataset
+
+
+def save_to_json(df:pd.DataaFrame, export_cols:list, fname:str="dev.json", dir:str=""):
+    dir = os.path.join(dir, fname)
+
+    logger.info(f"save test set {fname}...")
+    df[export_cols].to_json("dev.json", orient="records")
+    logger.info("DONE...")
 
 
 def resize_token_embeddings(model, new_token_size):
