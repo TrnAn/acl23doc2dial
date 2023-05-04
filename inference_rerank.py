@@ -8,7 +8,7 @@ from modelscope.pipelines.nlp import DocumentGroundedDialogRerankPipeline
 from modelscope.preprocessors.nlp import \
     DocumentGroundedDialogRerankPreprocessor
 from typing import Union
-
+import argparse
 
 class myDocumentGroundedDialogRerankPipeline(DocumentGroundedDialogRerankPipeline):
     def __init__(self,
@@ -36,6 +36,10 @@ class myDocumentGroundedDialogRerankPipeline(DocumentGroundedDialogRerankPipelin
 
 
 def main():
+    parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
+    parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
+    args = vars(parser.parse_args())
+
     model_dir = './output'
     model_configuration = {
         "framework": "pytorch",
@@ -84,7 +88,7 @@ def main():
                 ptr += 1
                 passage_to_id[every_passage] = str(ptr)
 
-    file_in = open('./DAMO_ConvAI/nlp_convai_retrieval_pretrain/evaluate_result.json', 'r')
+    file_in = open(f'{args.cache_dir}./DAMO_ConvAI/nlp_convai_retrieval_pretrain/evaluate_result.json', 'r')
     retrieval_result = json.load(file_in)['outputs']
     input_list = []
     passages_list = []

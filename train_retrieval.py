@@ -15,6 +15,7 @@ def main():
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
     parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
+    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
     args = parser.parse_args()
 
     fr_train_dataset = preprocessing.read('DAMO_ConvAI/FrDoc2BotRetrieval')
@@ -43,7 +44,7 @@ def main():
             
             all_passages += tmp
 
-    cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir='./')
+    cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=args.cache_dir)
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
         train_dataset=train_dataset,

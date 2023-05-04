@@ -2,15 +2,11 @@ from modelscope.msdatasets import MsDataset
 from modelscope.trainers.nlp.document_grounded_dialog_rerank_trainer import \
     DocumentGroundedDialogRerankTrainer
 from modelscope.utils.constant import DownloadMode
-import utils.preprocessing as preprocessing
+from modelscope.hub.snapshot_download import snapshot_download
 import argparse
 
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
-
-    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= True)
-    parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
-    parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
     parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
     args = vars(parser.parse_args())
 
@@ -61,8 +57,10 @@ def main():
         'DAMO_ConvAI/FrDoc2BotRerank',
         download_mode=DownloadMode.FORCE_REDOWNLOAD,
         split='train')
+    
+    cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=args.cache_dir)
     trainer = DocumentGroundedDialogRerankTrainer(
-        model='DAMO_ConvAI/nlp_convai_ranking_pretrain', dataset=train_dataset, args=args)
+        model=cache_path, dataset=train_dataset, args=args)
     trainer.train()
 
 

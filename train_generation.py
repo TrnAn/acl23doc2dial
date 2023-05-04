@@ -304,6 +304,7 @@ def main():
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
     parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
+    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
     args = parser.parse_args()
     
     # read in English + Chinese dataset
@@ -339,14 +340,14 @@ def main():
 
     export_cols = ["query", "response", "lang"] if args.use_lang_token else ["query", "response"]
     preprocessing.save_to_json(dev_df, export_cols)
-    
+
     freq_df = exploration.get_freq_df(train_df, dev_df)
     exploration.plot_freq(freq_df)
 
     with open('all_passages/id_to_passage.json') as f:
         id_to_passage = json.load(f)
 
-    cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir='./')
+    cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir=args.dir)
     trainer = DocumentGroundedDialogGenerateTrainer(
         model           =   cache_path,
         train_dataset   =   train_df.to_dict('records'), # train_dataset,
