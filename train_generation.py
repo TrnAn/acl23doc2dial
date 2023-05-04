@@ -313,27 +313,31 @@ def main():
 
     # read in Vietnamese + French dataset
     fr_train_dataset = preprocessing.read('DAMO_ConvAI/FrDoc2BotGeneration')
-    vi_train_dataset = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')
+    vn_train_dataset = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')
 
-    train_dataset_vn, dev_dataset_vn = preprocessing.test_split(vi_train_dataset)
-    train_dataset_fr, dev_dataset_fr = preprocessing.test_split(fr_train_dataset)
+    seed = 42
+    train_dataset_vn, dev_dataset_vn = preprocessing.test_split(vn_train_dataset, random_state=seed)
+    train_dataset_fr, dev_dataset_fr = preprocessing.test_split(fr_train_dataset, random_state=seed)
 
-    train_dataset_en, dev_dataset_en = preprocessing.test_split(en_train_dataset) 
-    train_dataset_cn, dev_dataset_cn = preprocessing.test_split(cn_train_dataset)
+    train_dataset_en, dev_dataset_en = preprocessing.test_split(en_train_dataset, random_state=seed)
+    train_dataset_cn, dev_dataset_cn = preprocessing.test_split(cn_train_dataset, random_state=seed)
 
     if args.use_lang_token:
-        tmp_fr      = preprocessing.add_lang_token(train_dataset_fr, "fr", ["query", "rerank"]) 
-        tmp_vn      = preprocessing.add_lang_token(train_dataset_vn, "vn", ["query", "rerank"]) 
-        tmp_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "passages"]) 
-        tmp_cn      = preprocessing.add_lang_token(train_dataset_cn, "cn", ["query", "passages"]) 
-        train_df    = pd.concat([tmp_fr, tmp_vn, tmp_en, tmp_cn])
+        train_dataset_fr      = preprocessing.add_lang_token(train_dataset_fr, "fr", ["query", "rerank"]) 
+        train_dataset_vn      = preprocessing.add_lang_token(train_dataset_vn, "vn", ["query", "rerank"]) 
+        train_dataset_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "passages"]) 
+        train_dataset_cn      = preprocessing.add_lang_token(train_dataset_cn, "cn", ["query", "passages"]) 
 
-        tmp_fr = preprocessing.add_lang_token(dev_dataset_fr, "fr", ["query", "rerank"]) 
-        tmp_vn = preprocessing.add_lang_token(dev_dataset_vn, "vn", ["query", "rerank"]) 
-        tmp_en = preprocessing.add_lang_token(dev_dataset_en, "en", ["query", "passages"]) 
-        tmp_cn = preprocessing.add_lang_token(dev_dataset_cn, "cn", ["query", "passages"]) 
-        dev_df = pd.concat([tmp_fr, tmp_vn, tmp_en, tmp_cn])
+        dev_dataset_fr = preprocessing.add_lang_token(dev_dataset_fr, "fr", ["query", "rerank"]) 
+        dev_dataset_vn = preprocessing.add_lang_token(dev_dataset_vn, "vn", ["query", "rerank"]) 
+        dev_dataset_en = preprocessing.add_lang_token(dev_dataset_en, "en", ["query", "passages"]) 
+        dev_dataset_cn = preprocessing.add_lang_token(dev_dataset_cn, "cn", ["query", "passages"]) 
 
+    train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn])
+    dev_df = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
+
+    export_cols = ["query", "response", "lang"] if args.use_lang_token else ["query", "response"]
+    dev_df[export_cols].to_json("dev.json", orient="records")
 
     freq_df = exploration.get_freq_df(train_df, dev_df)
     exploration.plot_freq(freq_df)

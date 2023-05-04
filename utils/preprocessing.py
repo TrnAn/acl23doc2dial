@@ -36,10 +36,10 @@ def read(dir:str, force_download:bool=False):
     return pd.DataFrame(list(dataset))
 
 
-def test_split(dataset:pd.DataFrame, test_size:float=0.1):
+def test_split(dataset:pd.DataFrame, random_state:int=42, test_size:float=0.1):
     logger.info("split dataset...")
     
-    return ([],[]) if len(list(dataset)) == 0 else train_test_split(dataset, test_size=test_size)
+    return ([],[]) if len(list(dataset)) == 0 else train_test_split(dataset, test_size=test_size, random_state=random_state)
 
 
 def add_lang_token(dataset:Union[pd.DataFrame, list], lang_key:str, colnames:list=["query"], token_colname:str="lang"):
