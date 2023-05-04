@@ -34,6 +34,7 @@ logger = get_logger()
 import sys
 sys.path.insert(0, '/path/to/your/local/folder')
 
+# TODO Fix bug for cn/en dataset: missing rerank column error - breaks at 'context' list comprehension
 def collate(batch):
     query = [item['query'] for item in batch]
     context = [json.loads(item['rerank']) for item in batch]
@@ -299,14 +300,14 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
 
-    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= True)
+    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= False)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
     parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
     args = parser.parse_args()
     
     # read in English + Chinese dataset
-    en_train_dataset, cn_train_dataset = [], []
+    en_train_dataset, cn_train_dataset = None, None
     if args.use_extended_dataset:
         cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
         en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
@@ -337,6 +338,8 @@ def main():
     dev_df = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
     export_cols = ["query", "response", "lang"] if args.use_lang_token else ["query", "response"]
+    fname = "dev.json"
+    logger.info(f"save test set {fname}...")
     dev_df[export_cols].to_json("dev.json", orient="records")
 
     freq_df = exploration.get_freq_df(train_df, dev_df)

@@ -6,7 +6,7 @@ from collections import defaultdict
 import pandas as pd
 from torch import nn 
 from typing import Union
-
+import json
 logger = get_logger()
 
 LANG_TOKENS = {"fr": "<fr>",
@@ -39,7 +39,7 @@ def read(dir:str, force_download:bool=False):
 def test_split(dataset:pd.DataFrame, random_state:int=42, test_size:float=0.1):
     logger.info("split dataset...")
     
-    return ([],[]) if len(list(dataset)) == 0 else train_test_split(dataset, test_size=test_size, random_state=random_state)
+    return (None, None) if dataset is None else train_test_split(dataset, test_size=test_size, random_state=random_state)
 
 
 def add_lang_token(dataset:Union[pd.DataFrame, list], lang_key:str, colnames:list=["query"], token_colname:str="lang"):
@@ -55,19 +55,22 @@ def add_lang_token(dataset:Union[pd.DataFrame, list], lang_key:str, colnames:lis
         _type_: _description_
     """
     logger.info(f"adding special language token {lang_key} to input query...")
-    if len(dataset) == 0:
-        return None 
+    if dataset is None:
+        return dataset 
     
     def concat_special_token(col):
         try:
             is_list = not isinstance(eval(col.iloc[0]), str)
         except:
             is_list = False
-
-        if not is_list:
-            return col + " " + LANG_TOKENS_DD[lang_key]
+        
+        if is_list:
+            tmp = pd.Series([[elem + " " + LANG_TOKENS_DD[lang_key] for elem in eval(sublist)] for sublist in col], index=col.index)
+            return tmp.apply(lambda s: json.dumps(s))
         else:
-            return [[elem + " " + LANG_TOKENS_DD[lang_key] for elem in eval(sublist)] for sublist in col]
+            return col + " " + LANG_TOKENS_DD[lang_key]  
+
+
             
     dataset[token_colname] = LANG_TOKENS_DD[lang_key]
     dataset[colnames] = dataset[colnames].apply(lambda x: concat_special_token(x)).astype("str")
