@@ -2,20 +2,24 @@ from modelscope.msdatasets import MsDataset
 from modelscope.trainers.nlp.document_grounded_dialog_rerank_trainer import \
     DocumentGroundedDialogRerankTrainer
 from modelscope.utils.constant import DownloadMode
-from modelscope.hub.snapshot_download import snapshot_download
+# from modelscope.hub.snapshot_download import snapshot_download
 import argparse
 
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
-    parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
+    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= False)
+    parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
+    parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
+    # parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
+    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
     args = vars(parser.parse_args())
 
     args.update({
         'device': 'gpu',
         'tokenizer_name': '',
-        'cache_dir': '',
+        'cache_dir': args["cache_dir"],
         'instances_size': 1,
-        'output_dir': './output',
+        'output_dir': f'{args["cache_dir"]}/output',
         'max_num_seq_pairs_per_device': 32,
         'full_train_batch_size': 32,
         'gradient_accumulation_steps': 32,
@@ -58,9 +62,9 @@ def main():
         download_mode=DownloadMode.FORCE_REDOWNLOAD,
         split='train')
     
-    cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=args.cache_dir)
+    # cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_ranking_pretrain', cache_dir=args["cache_dir"])
     trainer = DocumentGroundedDialogRerankTrainer(
-        model=cache_path, dataset=train_dataset, args=args)
+        model=f'DAMO_ConvAI/nlp_convai_ranking_pretrain', dataset=train_dataset, args=args)
     trainer.train()
 
 
