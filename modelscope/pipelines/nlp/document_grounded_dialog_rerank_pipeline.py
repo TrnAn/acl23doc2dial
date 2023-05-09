@@ -102,8 +102,11 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                 inst_id = jobj['id']
                 probs = self.one_instance(jobj['input_ids'],
                                           jobj['attention_mask'])
+                print(f"{jobj=}")
                 passages = jobj['passages']
                 query = jobj['query']
+                answer = jobj['output'][0]['answer']
+              
                 scored_pids = [(p['pid'], prob)
                                for p, prob in zip(passages, probs)]
                 scored_pids.sort(key=lambda x: x[1], reverse=True)
@@ -119,7 +122,7 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                     scored_pids,
                     'output': [{
                         'answer':
-                        '',
+                        answer, #'',
                         'provenance': [{
                             'wikipedia_id': wid
                         } for wid in wids]
