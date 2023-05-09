@@ -56,7 +56,7 @@ def add_lang_token(dataset:Union[pd.DataFrame, list], lang_key:str, colnames:lis
     Returns:
         _type_: _description_
     """
-    logger.info(f"adding special language token {lang_key} to input query...")
+    
     if dataset is None:
         return dataset 
     
@@ -72,7 +72,7 @@ def add_lang_token(dataset:Union[pd.DataFrame, list], lang_key:str, colnames:lis
         else:
             return col + " " + LANG_TOKENS_DD[lang_key]  
 
-
+    logger.info(f"adding special language token {lang_key} to input query...")
             
     dataset[token_colname] = LANG_TOKENS_DD[lang_key]
     dataset[colnames] = dataset[colnames].apply(lambda x: concat_special_token(x)).astype("str")
@@ -84,7 +84,7 @@ def save_to_json(df:pd.DataFrame, export_cols:list, fname:str="dev.json", dir:st
     dir = os.path.join(dir, fname)
 
     logger.info(f"save test set {fname}...")
-    df[export_cols].to_json("dev.json", orient="records")
+    df[export_cols].to_json("dev.json", orient="records", lines=True)
     logger.info("DONE...")
 
 
