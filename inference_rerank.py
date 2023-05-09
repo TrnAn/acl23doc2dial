@@ -59,7 +59,7 @@ def main():
     file_out = open(f'{model_dir}/configuration.json', 'w')
     json.dump(model_configuration, file_out, indent=4)
     file_out.close()
-    args = {
+    args.update({
         'output': './',
         'max_batch_size': 64,
         'exclude_instances': '',
@@ -70,7 +70,7 @@ def main():
         'tokenizer_resize': True,
         'model_resize': True,
         'kilt_data': True
-    }
+    })
     model = Model.from_pretrained(model_dir, **args)
     mypreprocessor = DocumentGroundedDialogRerankPreprocessor(
         model.model_dir, **args)
