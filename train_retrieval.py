@@ -35,6 +35,8 @@ def main():
     train_dataset   = pd.concat([train_dataset_fr, train_dataset_vn])
     dev_dataset     = pd.concat([dev_dataset_fr, dev_dataset_vn])
 
+    preprocessing.save_to_json(dev_dataset, dev_dataset.columns)
+
     all_passages = []
     for file_name in ['fr', 'vi']:
         with open(f'all_passages/{file_name}.json') as f:
@@ -45,7 +47,7 @@ def main():
             
             all_passages += tmp
 
-    print(args)
+
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=args.cache_dir)
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,

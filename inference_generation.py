@@ -20,13 +20,12 @@ def main():
     with open(f'{args.cache_dir}/rerank_output.jsonl') as f:
         for line in f.readlines():
             sample = json.loads(line)
-            print(f"{sample=}")
 
             eval_dataset.append({
                 'query': sample['input'],
                 'rerank': json.dumps([id_to_passage[x['wikipedia_id']] for x in sample['output'][0]['provenance']],
                                     ensure_ascii=False),
-                'response': sample['output'] #'<response> @'
+                'response': sample['output'][0]['answer'] #'<response> @'
             })
 
     cache_path = f'{args.cache_dir}/DAMO_ConvAI/nlp_convai_generation_pretrain'
@@ -34,7 +33,10 @@ def main():
         model=cache_path,
         train_dataset=None,
         eval_dataset=eval_dataset,
+        lang_token=args.lang_token
     )
+
+    print(os.path.join(trainer.model.model_dir, f'finetuned_model.bin'))
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                 f'finetuned_model.bin'))
     with open(f'{cache_path}/evaluate_result.json') as f:

@@ -15,9 +15,8 @@ def main():
         with open(f'{args.cache_dir}/input.jsonl', 'w') as f_out:
             for line in f_in.readlines():
                 sample = json.loads(line)
-                print(f"{sample=}")
-                sample['positive'] = ''
-                sample['negative'] = ''
+                # sample['positive'] = ''
+                # sample['negative'] = ''
                 f_out.write(json.dumps(sample, ensure_ascii=False) + '\n')
 
     with open(f'{args.cache_dir}/input.jsonl') as f:
@@ -26,14 +25,20 @@ def main():
     all_passages = []
     for file_name in ['fr', 'vi']:
         with open(f'all_passages/{file_name}.json') as f:
-            all_passages += json.load(f)
+            tmp = json.load(f)
+            
+            if args.lang_token:
+                tmp = [f'{s} <{file_name}>' for s in tmp]
+            
+            all_passages += tmp
 
-    cache_path = f'{args.cache_dir}./DAMO_ConvAI/nlp_convai_retrieval_pretrain'
+    cache_path = f'{args.cache_dir}/DAMO_ConvAI/nlp_convai_retrieval_pretrain'
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
         train_dataset=None,
         eval_dataset=eval_dataset,
-        all_passages=all_passages
+        all_passages=all_passages,
+        lang_token=args.lang_token
     )
 
     trainer.evaluate(

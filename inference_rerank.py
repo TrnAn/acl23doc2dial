@@ -86,12 +86,17 @@ def main():
     for file_name in ['fr', 'vi']:
         with open(f'./all_passages/{file_name}.json') as f:
             all_passages = json.load(f)
+            if args["lang_token"]:
+                all_passages = [passage + f" <{file_name}>" for passage in all_passages]
             for every_passage in all_passages:
                 ptr += 1
                 passage_to_id[every_passage] = str(ptr)
 
+
     file_in = open(f'{args["cache_dir"]}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/evaluate_result.json', 'r')
-    retrieval_result = json.load(file_in)['outputs']
+    retrieval_file      = json.load(file_in)
+    retrieval_result    = retrieval_file['outputs'] # predicted
+    retrieval_targets   = retrieval_file['targets']
     input_list = []
     passages_list = []
     ids_list = []
@@ -105,16 +110,21 @@ def main():
         now_wikipedia = []
         now_passages = []
         all_candidates = retrieval_result[ptr]
+        target = retrieval_targets[ptr]
+        
         for every_passage in all_candidates:
             get_pid = passage_to_id[every_passage]
             now_wikipedia.append({'wikipedia_id': str(get_pid)})
             now_passages.append({"pid": str(get_pid), "title": "", "text": every_passage})
-        now_output = [{'answer': '', 'provenance': now_wikipedia}]
+        now_output = [{'answer': target, 'provenance': now_wikipedia}]
+       
         input_list.append(now_input['query'])
         passages_list.append(str(now_passages))
         ids_list.append(now_id)
         output_list.append(str(now_output))
+        
         positive_pids_list.append(str([]))
+   
     evaluate_dataset = {'input': input_list, 'id': ids_list, 'passages': passages_list, 'output': output_list,
                         'positive_pids': positive_pids_list}
     pipeline_ins(evaluate_dataset)
