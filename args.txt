@@ -1,2 +1,2 @@
---use-lang-token=True
---use-extended-dataset=False
+--lang-token
+--cache-dir=lang_token_no_ext_ds
