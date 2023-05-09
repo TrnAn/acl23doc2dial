@@ -10,20 +10,23 @@ import argparse
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
 
     with open('all_passages/id_to_passage.json') as f:
         id_to_passage = json.load(f)
 
     eval_dataset = []
-    with open('rerank_output.jsonl') as f:
+    with open(f'{args.cache_dir}/rerank_output.jsonl') as f:
         for line in f.readlines():
             sample = json.loads(line)
+            print(f"{sample=}")
+
             eval_dataset.append({
                 'query': sample['input'],
                 'rerank': json.dumps([id_to_passage[x['wikipedia_id']] for x in sample['output'][0]['provenance']],
                                     ensure_ascii=False),
-                'response': '<response> @'
+                'response': sample['output'] #'<response> @'
             })
 
     cache_path = f'{args.cache_dir}/DAMO_ConvAI/nlp_convai_generation_pretrain'
@@ -37,7 +40,7 @@ def main():
     with open(f'{cache_path}/evaluate_result.json') as f:
         predictions = json.load(f)['outputs']
 
-    with open('outputStandardFileBaseline.json', 'w') as f:
+    with open(f'{args.cache_dir}/outputStandardFileBaseline.json', 'w') as f:
         for query, prediction in zip(eval_dataset, predictions):
             f.write(json.dumps({
                 'query': query['query'],

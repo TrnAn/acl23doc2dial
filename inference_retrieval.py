@@ -8,17 +8,19 @@ import argparse
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction, default=True)
     args = parser.parse_args()
 
     with open('dev.json') as f_in:
-        with open('input.jsonl', 'w') as f_out:
+        with open(f'{args.cache_dir}/input.jsonl', 'w') as f_out:
             for line in f_in.readlines():
                 sample = json.loads(line)
+                print(f"{sample=}")
                 sample['positive'] = ''
                 sample['negative'] = ''
                 f_out.write(json.dumps(sample, ensure_ascii=False) + '\n')
 
-    with open('input.jsonl') as f:
+    with open(f'{args.cache_dir}/input.jsonl') as f:
         eval_dataset = [json.loads(line) for line in f.readlines()]
 
     all_passages = []

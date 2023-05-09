@@ -304,12 +304,16 @@ def main():
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
     parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
-    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
+    parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
+    parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
+    parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 16)
+    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 8)
     args = parser.parse_args()
     
     # read in English + Chinese dataset
     en_train_dataset, cn_train_dataset = None, None
-    if args.use_extended_dataset:
+    print(f"{args.extended_dataset=}")
+    if args.extended_dataset:
         cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
         en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
 
@@ -324,7 +328,7 @@ def main():
     train_dataset_en, dev_dataset_en = preprocessing.test_split(en_train_dataset, random_state=seed)
     train_dataset_cn, dev_dataset_cn = preprocessing.test_split(cn_train_dataset, random_state=seed)
 
-    if args.use_lang_token:
+    if args.lang_token:
         train_dataset_fr      = preprocessing.add_lang_token(train_dataset_fr, "fr", ["query", "rerank"]) 
         train_dataset_vn      = preprocessing.add_lang_token(train_dataset_vn, "vn", ["query", "rerank"]) 
         train_dataset_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "passages"]) 
@@ -338,7 +342,7 @@ def main():
     train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn])
     dev_df = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
-    export_cols = ["query", "response", "lang"] if args.use_lang_token else ["query", "response"]
+    export_cols = ["query", "response", "lang"] if args.lang_token else ["query", "response"]
     preprocessing.save_to_json(dev_df, export_cols)
 
     freq_df = exploration.get_freq_df(train_df, dev_df)
@@ -347,15 +351,15 @@ def main():
     with open('all_passages/id_to_passage.json') as f:
         id_to_passage = json.load(f)
 
-    cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir=args.dir)
+    cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir=args.cache_dir)
     trainer = DocumentGroundedDialogGenerateTrainer(
         model           =   cache_path,
         train_dataset   =   train_df.to_dict('records'), # train_dataset,
         eval_dataset    =   dev_df.to_dict('records'), # train_dataset[:100],
-        use_lang_token  =   args.use_lang_token
+        lang_token      =   args.lang_token
     )
 
-    train(trainer, batch_size=16, accumulation_steps=1, total_epoches=10, learning_rate=1e-4)
+    train(trainer, batch_size=args.per_gpu_train_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 
