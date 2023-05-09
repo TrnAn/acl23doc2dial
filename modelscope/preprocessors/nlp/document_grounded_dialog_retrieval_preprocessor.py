@@ -36,7 +36,7 @@ class DocumentGroundedDialogRetrievalPreprocessor(Preprocessor):
         self.tokenizer = XLMRobertaTokenizer.from_pretrained(
             os.path.join(self.model_dir))
         
-        if kwargs["use_lang_token"]:
+        if kwargs["lang_token"]:
             self.tokenizer.add_tokens(LANG_TOKENS_DD.values())
 
         self.token_length = len(self.tokenizer)

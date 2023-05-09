@@ -44,7 +44,7 @@ class DocumentGroundedDialogGeneratePreprocessor(Preprocessor):
             os.path.join(self.model_dir, 'generation'))
 
          # add special language tokens <lang> to tokenizer
-        if kwargs["use_lang_token"]:
+        if kwargs["lang_token"]:
             self.rerank_tokenizer.add_tokens(LANG_TOKENS_DD.values())
             self.generation_tokenizer.add_tokens(LANG_TOKENS_DD.values())
 

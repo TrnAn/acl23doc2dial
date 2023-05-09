@@ -86,6 +86,7 @@ class Config:
     @staticmethod
     def _file2dict(filename):
         filename = osp.abspath(osp.expanduser(filename))
+        print(f"{filename=}")
         if not osp.exists(filename):
             raise ValueError(f'File does not exists {filename}')
         fileExtname = osp.splitext(filename)[1]
@@ -119,6 +120,7 @@ class Config:
             tmp_cfg_file.close()
 
         cfg_text = filename + '\n'
+
         with open(filename, 'r', encoding='utf-8') as f:
             # Setting encoding explicitly to resolve coding issue on windows
             cfg_text += f.read()

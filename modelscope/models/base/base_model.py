@@ -96,6 +96,8 @@ class Model(ABC):
             >>> Model.from_pretrained('damo/nlp_structbert_backbone_base_std', task='text-classification')
         """
         prefetched = kwargs.get('model_prefetched')
+
+        print(f"{prefetched=}")
         if prefetched is not None:
             kwargs.pop('model_prefetched')
         invoked_by = kwargs.get(Invoke.KEY)
@@ -115,6 +117,7 @@ class Model(ABC):
             invoked_by = '%s/%s' % (Invoke.KEY, invoked_by)
             local_model_dir = snapshot_download(
                 model_name_or_path, revision, user_agent=invoked_by)
+            print(f"{local_model_dir=}")
         logger.info(f'initialize model from {local_model_dir}')
         if cfg_dict is not None:
             cfg = cfg_dict

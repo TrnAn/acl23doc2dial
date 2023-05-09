@@ -165,10 +165,10 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
     def __init__(self, model: str, revision='v1.0.0', *args, **kwargs):
         self.model = Model.from_pretrained(model, revision=revision)
         self.preprocessor = DocumentGroundedDialogGeneratePreprocessor(
-            model_dir=self.model.model_dir, use_lang_token=kwargs["use_lang_token"])
+            model_dir=self.model.model_dir, lang_token=kwargs["lang_token"])
         self.device = self.preprocessor.device
 
-        if kwargs["use_lang_token"]:
+        if kwargs["lang_token"]:
             self.model.model.rerank.encoder.resize_token_embeddings(self.preprocessor.token_length)
 
         self.model.model.to(self.device)

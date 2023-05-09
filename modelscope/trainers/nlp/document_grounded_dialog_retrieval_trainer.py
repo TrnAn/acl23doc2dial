@@ -82,10 +82,10 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
     def __init__(self, model: str, revision='v1.0.0', *args, **kwargs):
         self.model = Model.from_pretrained(model, revision=revision)
         self.preprocessor = DocumentGroundedDialogRetrievalPreprocessor(
-            model_dir=self.model.model_dir, use_lang_token=kwargs["use_lang_token"])
+            model_dir=self.model.model_dir, use_lang_token=kwargs["lang_token"])
         self.device = self.preprocessor.device
 
-        if kwargs["use_lang_token"]:
+        if kwargs["lang_token"]:
             self.model.model.qry_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize query encoder of DPR model
             self.model.model.ctx_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize context encoder of DPR model
 
