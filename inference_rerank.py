@@ -42,7 +42,7 @@ def main():
     
     args = vars(parser.parse_args())
 
-    model_dir = f'./{args.cache_dir}/output'
+    model_dir = f'./{args["cache_dir"]}/output'
     model_configuration = {
         "framework": "pytorch",
         "task": "document-grounded-dialog-rerank",
@@ -77,7 +77,7 @@ def main():
     pipeline_ins = myDocumentGroundedDialogRerankPipeline(
         model=model, preprocessor=mypreprocessor, **args)
 
-    file_in = open(f'./{args.cache_dir}/input.jsonl', 'r')
+    file_in = open(f'./{args["cache_dir"]}/input.jsonl', 'r')
     all_querys = []
     for every_query in file_in:
         all_querys.append(json.loads(every_query))
@@ -90,7 +90,7 @@ def main():
                 ptr += 1
                 passage_to_id[every_passage] = str(ptr)
 
-    file_in = open(f'{args.cache_dir}./DAMO_ConvAI/nlp_convai_retrieval_pretrain/evaluate_result.json', 'r')
+    file_in = open(f'{args["cache_dir"]}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/evaluate_result.json', 'r')
     retrieval_result = json.load(file_in)['outputs']
     input_list = []
     passages_list = []
@@ -118,7 +118,7 @@ def main():
     evaluate_dataset = {'input': input_list, 'id': ids_list, 'passages': passages_list, 'output': output_list,
                         'positive_pids': positive_pids_list}
     pipeline_ins(evaluate_dataset)
-    pipeline_ins.save(f'./{args.cache_dir}/rerank_output.jsonl')
+    pipeline_ins.save(f'./{args["cache_dir"]}/rerank_output.jsonl')
 
 
 if __name__ == '__main__':
