@@ -13,7 +13,7 @@ def main():
 
     parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
-    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
     parser.add_argument("--batch-accumulation", help= "Use batch accumulation to maintain baseline results", action=argparse.BooleanOptionalAction)
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
     
@@ -35,7 +35,7 @@ def main():
     train_dataset   = pd.concat([train_dataset_fr, train_dataset_vn])
     dev_dataset     = pd.concat([dev_dataset_fr, dev_dataset_vn])
 
-    preprocessing.save_to_json(dev_dataset, dev_dataset.columns)
+    preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname="dev_no_lang_token.json")
 
     all_passages = []
     for file_name in ['fr', 'vi']:

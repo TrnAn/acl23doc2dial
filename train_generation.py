@@ -300,14 +300,14 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
 
-    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction, default=False)
-    parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
-    parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
-    parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
     parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 16)
     parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 8)
+    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--batch-accumulation", help= "Use batch accumulation to maintain baseline results", action=argparse.BooleanOptionalAction)
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
     args = parser.parse_args()
     
@@ -358,6 +358,10 @@ def main():
         eval_dataset    =   dev_df.to_dict('records'), # train_dataset[:100],
         lang_token      =   args.lang_token
     )
+
+    # use batch accumulation
+    if args.batch_accumulation:
+        args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_train_batch_size)
 
     train(trainer, batch_size=args.per_gpu_train_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,

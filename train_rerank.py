@@ -9,7 +9,7 @@ def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= False)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
-    parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
     # parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
     args = vars(parser.parse_args())
