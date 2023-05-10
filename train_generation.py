@@ -345,8 +345,9 @@ def main():
     export_cols = ["query", "response", "lang"] if args.lang_token else ["query", "response"]
     preprocessing.save_to_json(dev_df, export_cols, fname="gold_dev_no_lang_token.json")
 
-    freq_df = exploration.get_freq_df(train_df, dev_df)
-    exploration.plot_freq(freq_df)
+    if args.lang_token:
+        freq_df = exploration.get_freq_df(train_df, dev_df)
+        exploration.plot_freq(freq_df)
 
     with open('all_passages/id_to_passage.json') as f:
         id_to_passage = json.load(f)
