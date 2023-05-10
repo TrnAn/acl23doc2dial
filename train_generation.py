@@ -300,7 +300,7 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
 
-    parser.add_argument("--use-extended-dataset", help= "Run experiments on English and Chinese dataset", type= bool, default= False)
+    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction, default=False)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--use-lang-token", help= "Add language token <lang> to input", type= bool, default= True)
     parser.add_argument("--use-batch-accumulation", help= "Use batch accumulation to maintain baseline results", type= bool, default= False)
@@ -308,11 +308,11 @@ def main():
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 16)
     parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 8)
+    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
     args = parser.parse_args()
     
     # read in English + Chinese dataset
     en_train_dataset, cn_train_dataset = None, None
-    print(f"{args.extended_dataset=}")
     if args.extended_dataset:
         cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
         en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
@@ -343,7 +343,7 @@ def main():
     dev_df = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
     export_cols = ["query", "response", "lang"] if args.lang_token else ["query", "response"]
-    preprocessing.save_to_json(dev_df, export_cols)
+    preprocessing.save_to_json(dev_df, export_cols, fname="gold_dev_no_lang_token.json")
 
     freq_df = exploration.get_freq_df(train_df, dev_df)
     exploration.plot_freq(freq_df)
