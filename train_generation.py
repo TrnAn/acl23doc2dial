@@ -185,7 +185,8 @@ def train(trainer,
         dataset=trainer.train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        collate_fn=collate)
+        collate_fn=collate,
+        pin_memory=True)
 
     optimizer = prepare_optimizer(trainer.model.model, learning_rate,
                                   weight_decay, eps)
@@ -259,7 +260,8 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
     valid_loader = DataLoader(
         dataset=trainer.eval_dataset,
         batch_size=batch_size,
-        collate_fn=collate)
+        collate_fn=collate, 
+        pin_memory=True)
     trainer.model.model.eval()
     with torch.no_grad():
         results = {'outputs': [], 'targets': []}
@@ -299,16 +301,16 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
 
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
-
     parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 16)
     parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 8)
-    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction, default=False)
+    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
     parser.add_argument("--batch-accumulation", help= "Use batch accumulation to maintain baseline results", action=argparse.BooleanOptionalAction)
-    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
+    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
     args = parser.parse_args()
     
     # read in English + Chinese dataset
@@ -316,7 +318,15 @@ def main():
     if args.extended_dataset:
         cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
         en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
+        cn_train_dataset = cn_train_dataset.rename({"passages": "rerank"},  axis='columns')
+        en_train_dataset = en_train_dataset.rename({"passages": "rerank"},  axis='columns')
 
+        cn_train_dataset = cn_train_dataset.astype(str)
+        en_train_dataset = en_train_dataset.astype(str)
+        # cn_train_dataset = cn_train_dataset.apply(lambda s: s.apply(lambda x: json.dumps(x)))
+        # en_train_dataset = en_train_dataset.apply(lambda s: s.apply(lambda x: json.dumps(x)))
+    
+    print(en_train_dataset.head(1))
     # read in Vietnamese + French dataset
     fr_train_dataset = preprocessing.read('DAMO_ConvAI/FrDoc2BotGeneration')
     vn_train_dataset = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')
@@ -331,20 +341,22 @@ def main():
     if args.lang_token:
         train_dataset_fr      = preprocessing.add_lang_token(train_dataset_fr, "fr", ["query", "rerank"]) 
         train_dataset_vn      = preprocessing.add_lang_token(train_dataset_vn, "vn", ["query", "rerank"]) 
-        train_dataset_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "passages"]) 
-        train_dataset_cn      = preprocessing.add_lang_token(train_dataset_cn, "cn", ["query", "passages"]) 
+        train_dataset_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "rerank"]) 
+        train_dataset_cn      = preprocessing.add_lang_token(train_dataset_cn, "cn", ["query", "rerank"]) 
 
         dev_dataset_fr = preprocessing.add_lang_token(dev_dataset_fr, "fr", ["query", "rerank"]) 
         dev_dataset_vn = preprocessing.add_lang_token(dev_dataset_vn, "vn", ["query", "rerank"]) 
-        dev_dataset_en = preprocessing.add_lang_token(dev_dataset_en, "en", ["query", "passages"]) 
-        dev_dataset_cn = preprocessing.add_lang_token(dev_dataset_cn, "cn", ["query", "passages"]) 
+        dev_dataset_en = preprocessing.add_lang_token(dev_dataset_en, "en", ["query", "rerank"]) 
+        dev_dataset_cn = preprocessing.add_lang_token(dev_dataset_cn, "cn", ["query", "rerank"]) 
 
     train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn])
     dev_df = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
-    export_cols = ["query", "response", "lang"] if args.lang_token else ["query", "response"]
-    preprocessing.save_to_json(dev_df, export_cols, fname="gold_dev_no_lang_token.json")
-
+ 
+    if args.eval_input_file is None:
+        raise Exception("Please specify arg --eval-input-file to read eval dataset from")
+    preprocessing.save_to_json(dev_df, dev_df.columns, fname=args.eval_input_file)
+    
     if args.lang_token:
         freq_df = exploration.get_freq_df(train_df, dev_df)
         exploration.plot_freq(freq_df)
@@ -362,9 +374,9 @@ def main():
 
     # use batch accumulation
     if args.batch_accumulation:
-        args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_train_batch_size)
+        args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_batch_size)
 
-    train(trainer, batch_size=args.per_gpu_train_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
+    train(trainer, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 

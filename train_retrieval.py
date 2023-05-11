@@ -15,7 +15,7 @@ def main():
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
     parser.add_argument("--batch-accumulation", help= "Use batch accumulation to maintain baseline results", action=argparse.BooleanOptionalAction)
-    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
+    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
     
     args = parser.parse_args()
 

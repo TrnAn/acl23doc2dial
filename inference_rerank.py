@@ -37,9 +37,10 @@ class myDocumentGroundedDialogRerankPipeline(DocumentGroundedDialogRerankPipelin
 
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
-    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= "./")
-    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction, default=True)
-    
+    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
     args = vars(parser.parse_args())
 
     model_dir = f'./{args["cache_dir"]}/output'
