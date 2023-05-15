@@ -5,6 +5,7 @@ from modelscope.trainers.nlp.document_grounded_dialog_generate_trainer import \
 from train_generation import evaluate
 import datetime
 import argparse
+import pandas as pd
 
 
 def main():
@@ -18,7 +19,7 @@ def main():
 
     with open('all_passages/id_to_passage.json') as f:
         id_to_passage = json.load(f)
-
+    
     
     if args.extended_dataset:
         if args.eval_input_file is None:
@@ -29,7 +30,6 @@ def main():
         with open(f'{args.cache_dir}/rerank_output.jsonl') as f:
             for line in f.readlines():
                 sample = json.loads(line)
-
                 eval_dataset.append({
                     'query': sample['input'],
                     'rerank': json.dumps([id_to_passage[x['wikipedia_id']] for x in sample['output'][0]['provenance']],

@@ -88,7 +88,7 @@ def main():
         with open(f'./all_passages/{file_name}.json') as f:
             all_passages = json.load(f)
             if args["lang_token"]:
-                all_passages = [passage + f" <{file_name}>" for passage in all_passages]
+                all_passages = [f"<{file_name}> " + passage for passage in all_passages]
             for every_passage in all_passages:
                 ptr += 1
                 passage_to_id[every_passage] = str(ptr)

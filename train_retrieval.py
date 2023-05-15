@@ -43,7 +43,7 @@ def main():
             tmp = json.load(f)
             
             if args.lang_token:
-                tmp = [f'{s} <{file_name}>' for s in tmp]
+                tmp = [f'<{file_name}> {s}' for s in tmp]
             
             all_passages += tmp
 
