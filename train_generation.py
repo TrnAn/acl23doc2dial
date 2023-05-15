@@ -225,8 +225,6 @@ def train(trainer,
 
             loss = model(input_ids=input_ids, labels=label_ids)[0]
 
-            print(f"Memory cached: {torch.cuda.memory_allocated()/1024**2}MB")
-
             if accumulation_steps > 1:
                 loss = loss / accumulation_steps
 
@@ -244,7 +242,7 @@ def train(trainer,
                 )
                 losses = []
 
-            print(f"Memory cached end of train loop step in GPU: {torch.cuda.memory_allocated()/1024**2}MB")
+            print(f"Memory cached: {torch.cuda.memory_allocated()/1024**2}MB")
 
         if losses:
             logger.info(
@@ -324,10 +322,10 @@ def main():
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 16)
     parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 16)
-    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
     parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
-    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
     parser.add_argument("--batch-accumulation", help= "Use batch accumulation to maintain baseline results", action=argparse.BooleanOptionalAction)
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
     args = parser.parse_args()
