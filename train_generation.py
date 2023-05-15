@@ -2,12 +2,13 @@ import os
 import re
 import string
 from collections import Counter
-
+import gc
 import json
 import sacrebleu
 import torch
 import tqdm
 import pandas as pd
+from ast import literal_eval
 from rouge import Rouge
 from torch.utils.data import DataLoader
 from transformers import AdamW, get_scheduler
@@ -37,7 +38,7 @@ sys.path.insert(0, '/path/to/your/local/folder')
 # TODO Fix bug for cn/en dataset: missing rerank column error - breaks at 'context' list comprehension
 def collate(batch):
     query = [item['query'] for item in batch]
-    context = [json.loads(item['rerank']) for item in batch]
+    context = [item['rerank'] for item in batch]
     label = [item['response'] for item in batch]
     return query, context, label
 
@@ -186,6 +187,7 @@ def train(trainer,
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate,
+        num_workers=4,
         pin_memory=True)
 
     optimizer = prepare_optimizer(trainer.model.model, learning_rate,
@@ -204,15 +206,26 @@ def train(trainer,
                     tokenizer([x], add_special_tokens=False, return_tensors='pt')['input_ids'][0][:128])
                 for x in query
             ]
+            # print(f"query - number of tokens: {len(query)}")
+
             generator_inputs = [
                 ' '.join([query[i], '<passage>', context[i][0]])
                 for i in range(len(query))
             ]
+        
+            # for i in range(len(query)):
+            #     print(f"context= {context[i]}")
+            #     print(f"context at i= {context[i][0]}")
+            #     print(f"context length: {len(context[i][0])}") 
+
             input_ids = tokenizer.batch_encode_plus(
                 list(generator_inputs), padding=True, return_tensors='pt').input_ids.to(device)
             label_ids = tokenizer.batch_encode_plus(
                 list(label), padding=True, return_tensors='pt').input_ids.to(device)
+
             loss = model(input_ids=input_ids, labels=label_ids)[0]
+
+            print(f"Memory cached: {torch.cuda.memory_allocated()/1024**2}MB")
 
             if accumulation_steps > 1:
                 loss = loss / accumulation_steps
@@ -230,6 +243,9 @@ def train(trainer,
                     f'epoch: {epoch} \t batch: {batch_size * index} \t loss: {sum(losses) / len(losses)}'
                 )
                 losses = []
+
+            print(f"Memory cached end of train loop step in GPU: {torch.cuda.memory_allocated()/1024**2}MB")
+
         if losses:
             logger.info(
                 f'epoch: {epoch} \t batch: last \t loss: {sum(losses) / len(losses)}'
@@ -300,15 +316,18 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
 
 
 def main():
+    gc.collect()
+
+    torch.cuda.empty_cache()
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 16)
-    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 8)
-    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 16)
+    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
-    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--batch-accumulation", help= "Use batch accumulation to maintain baseline results", action=argparse.BooleanOptionalAction)
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
     args = parser.parse_args()
@@ -321,12 +340,10 @@ def main():
         cn_train_dataset = cn_train_dataset.rename({"passages": "rerank"},  axis='columns')
         en_train_dataset = en_train_dataset.rename({"passages": "rerank"},  axis='columns')
 
-        cn_train_dataset = cn_train_dataset.astype(str)
-        en_train_dataset = en_train_dataset.astype(str)
-        # cn_train_dataset = cn_train_dataset.apply(lambda s: s.apply(lambda x: json.dumps(x)))
-        # en_train_dataset = en_train_dataset.apply(lambda s: s.apply(lambda x: json.dumps(x)))
+        # if not args.lang_token:
+        #     # cn_train_dataset["rerank"] = cn_train_dataset.rerank.apply(lambda s: json.loads(s))
+        #     cn_train_dataset["rerank"] = cn_train_dataset.rerank.apply(literal_eval)
     
-    print(en_train_dataset.head(1))
     # read in Vietnamese + French dataset
     fr_train_dataset = preprocessing.read('DAMO_ConvAI/FrDoc2BotGeneration')
     vn_train_dataset = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')
@@ -349,10 +366,19 @@ def main():
         dev_dataset_en = preprocessing.add_lang_token(dev_dataset_en, "en", ["query", "rerank"]) 
         dev_dataset_cn = preprocessing.add_lang_token(dev_dataset_cn, "cn", ["query", "rerank"]) 
 
-    train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn])
-    dev_df = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
+    train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_cn])
+    dev_df      = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_cn])
 
- 
+
+    # tmp = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en])
+    df_wo_cn    = train_df.head(len(train_df) - len(train_dataset_cn))
+    max_len     = len(max(sum(df_wo_cn.rerank.tolist(), []), key=len))
+    train_df["rerank"]  = train_df.rerank.apply(lambda s: [x[:max_len] for x in s])
+    dev_df["rerank"]    = dev_df.rerank.apply(lambda s: [x[:max_len] for x in s])
+
+    # max_len = tmp.rerank.str.len().max()
+    # train_df["rerank"] = train_df["rerank"].apply(lambda x: literal_eval(x)[:max_len] if args.lang_token else json.dumps(literal_eval(x)[:max_len])) 
+
     if args.eval_input_file is None:
         raise Exception("Please specify arg --eval-input-file to read eval dataset from")
     preprocessing.save_to_json(dev_df, dev_df.columns, fname=args.eval_input_file)
@@ -376,6 +402,7 @@ def main():
     if args.batch_accumulation:
         args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_batch_size)
 
+    print(f"BATCH SIZE: {args.per_gpu_batch_size}")
     train(trainer, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
