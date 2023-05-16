@@ -23,8 +23,6 @@ sbatch <<EOT
 #SBATCH --gres=gpu:v100:1
 
 nvidia-smi
-EOT
-
 source /ukp-storage-1/tran/miniconda3/etc/profile.d/conda.sh
 conda activate acl23doc2dial
 module purge
@@ -40,3 +38,5 @@ else
 fi
 
 exit 0
+EOT
+
