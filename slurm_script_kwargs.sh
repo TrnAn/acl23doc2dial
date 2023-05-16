@@ -19,8 +19,8 @@ sbatch <<EOT
 #SBATCH --account=ukp-student
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
-#SBATCH --mem=64GB
-#SBATCH --gres=gpu:v100:1
+#SBATCH --mem-per-gpu=24g
+#SBATCH --gres=gpu:1
 
 nvidia-smi
 source /ukp-storage-1/tran/miniconda3/etc/profile.d/conda.sh
@@ -36,7 +36,6 @@ else
     echo "run script /wo extended datasets..."
     bash /ukp-storage-1/tran/acl23doc2dial/run.sh --lang_token $lang_token --fname $fname --per_gpu_batch_size $per_gpu_batch_size
 fi
-
 exit 0
 EOT
 
