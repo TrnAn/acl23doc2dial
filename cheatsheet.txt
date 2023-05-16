@@ -1,0 +1,6 @@
+/storage/ukp/shared/shared_daheim_tran #shared folder
+srun --qos yolo -p yolo --gres=gpu:1 --mem-per-cpu=24g --pty bash
+srun -p testing --gres=gpu:1 --mem-per-cpu=24g --pty bash
+
+
+bash slurm_script_kwargs.sh --extended 1 --lang_token 1 --fname ext_lang_token --per_gpu_batch_size 4
