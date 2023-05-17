@@ -24,7 +24,8 @@ def main():
     if args.extended_dataset:
         if args.eval_input_file is None:
             raise Exception("Please specify arg --eval-input-file to read eval dataset from")
-        eval_dataset = pd.read_json(args.eval_input_file, orient="records", lines=True)
+        eval_dataset = pd.read_json(args.eval_input_file, lines=True)
+        eval_dataset = eval_dataset.to_dict('records')
     else:
         eval_dataset = []
         with open(f'{args.cache_dir}/rerank_output.jsonl') as f:
