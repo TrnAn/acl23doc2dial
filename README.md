@@ -43,5 +43,5 @@
   bash slurm_script_kwargs.sh --extended 0 --lang_token 1 --fname lang_token --per_gpu_batch_size 1
   
   # \w extended datasets, i.e., adding the English and Chinese datasets
-  bash slurm_script_kwargs.sh --extended 1 --lang_token 1 --fname lang_token --per_gpu_batch_size 1
+  bash slurm_script_kwargs.sh --extended 1 --lang_token 0 --fname no_lang_token --per_gpu_batch_size 1
   ```
