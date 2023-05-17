@@ -8,6 +8,8 @@ from torch import nn
 from typing import Union
 import json
 import os 
+from ast import literal_eval
+
 
 logger = get_logger()
 
@@ -62,20 +64,15 @@ def add_lang_token(dataset:Union[pd.DataFrame, list], lang_key:str, colnames:lis
     
     def concat_special_token(col):
         try:
-            is_list = not isinstance(eval(col.iloc[0]), str)
+            tmp = col.apply(literal_eval)
+            return tmp.apply(lambda l: [ LANG_TOKENS_DD[lang_key] + " " + x for x in l])
         except:
-            is_list = False
-        
-        if is_list:
-            tmp = pd.Series([[elem + " " + LANG_TOKENS_DD[lang_key] for elem in eval(sublist)] for sublist in col], index=col.index)
-            return tmp.apply(lambda s: json.dumps(s))
-        else:
-            return col + " " + LANG_TOKENS_DD[lang_key]  
+            return   LANG_TOKENS_DD[lang_key] + " " + col
 
     logger.info(f"adding special language token {lang_key} to input query...")
             
     dataset[token_colname] = LANG_TOKENS_DD[lang_key]
-    dataset[colnames] = dataset[colnames].apply(lambda x: concat_special_token(x)).astype("str")
+    dataset[colnames] = dataset[colnames].apply(lambda x: concat_special_token(x))
 
     return dataset
 
@@ -84,39 +81,5 @@ def save_to_json(df:pd.DataFrame, export_cols:list, fname:str="dev.json", dir:st
     dir = os.path.join(dir, fname)
 
     logger.info(f"save test set {fname}...")
-    df[export_cols].to_json("dev.json", orient="records", lines=True)
+    df[export_cols].to_json(fname, orient="records", lines=True)
     logger.info("DONE...")
-
-
-def resize_token_embeddings(model, new_token_size):
-    """resize embedding layer of Modelscope models to fit updated number of tokens
-
-    Args:
-        model (modelscope.models.Model): model to resize embeddings
-        new_token_size (int): new token embedding size
-
-    Returns:
-        modelscope.models.Model: model with resized token embeddings
-    """
-
-    embedding_layer = model.embeddings.word_embeddings
-    old_num_tokens, old_embedding_dim = embedding_layer.weight.shape
-
-    # create new embedding layer with new token emb size
-    new_embeddings = nn.Embedding(
-            new_token_size, old_embedding_dim
-    )
-
-    new_embeddings.to(
-        embedding_layer.weight.device,
-        dtype=embedding_layer.weight.dtype,
-    )
-
-    # copying old entries
-    new_embeddings.weight.data[:old_num_tokens, :] = embedding_layer.weight.data[
-        :old_num_tokens, :
-    ]
-
-    model.embeddings.word_embeddings = new_embeddings
-
-    return model
