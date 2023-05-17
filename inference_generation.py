@@ -14,6 +14,7 @@ def main():
     parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
     parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
     parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
+    parser.add_argument("--eval-lang", help= "Specify languages to evaluate results on", action='append', ngargs='+')
     args = parser.parse_args()
 
 
@@ -25,6 +26,7 @@ def main():
         if args.eval_input_file is None:
             raise Exception("Please specify arg --eval-input-file to read eval dataset from")
         eval_dataset = pd.read_json(args.eval_input_file, lines=True)
+        eval_dataset = eval_dataset[eval_dataset.lang.isin(args.eval_lang)]
         eval_dataset = eval_dataset.to_dict('records')
     else:
         eval_dataset = []
@@ -51,7 +53,8 @@ def main():
     with open(f'{cache_path}/evaluate_result.json') as f:
         predictions = json.load(f)['outputs']
 
-    with open(f'{args.cache_dir}/outputStandardFileBaseline.json', 'w') as f:
+    eval_langs = "_".join(args.eval_lang)    
+    with open(f'{args.cache_dir}/outputStandardFileBaseline_{eval_langs}.json', 'w') as f:
         for query, prediction in zip(eval_dataset, predictions):
             f.write(json.dumps({
                 'query': query['query'],

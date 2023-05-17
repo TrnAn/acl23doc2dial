@@ -11,6 +11,7 @@ def main():
     parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
     parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
     parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)    
+    parser.add_argument("--eval-lang", help= "Specify languages to evaluate results on", action='append', ngargs='+')
     args = parser.parse_args()
 
     with open('dev_no_lang_token.json') as f_in:
