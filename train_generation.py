@@ -338,6 +338,8 @@ def main():
         cn_train_dataset = cn_train_dataset.rename({"passages": "rerank"},  axis='columns')
         en_train_dataset = en_train_dataset.rename({"passages": "rerank"},  axis='columns')
 
+        cn_train_dataset["lang"] = "<cn>"
+        en_train_dataset["lang"] = "<en>"
         # if not args.lang_token:
         #     # cn_train_dataset["rerank"] = cn_train_dataset.rerank.apply(lambda s: json.loads(s))
         #     cn_train_dataset["rerank"] = cn_train_dataset.rerank.apply(literal_eval)
@@ -345,6 +347,9 @@ def main():
     # read in Vietnamese + French dataset
     fr_train_dataset = preprocessing.read('DAMO_ConvAI/FrDoc2BotGeneration')
     vn_train_dataset = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')
+
+    fr_train_dataset["lang"] = "<fr>"
+    vn_train_dataset["lang"] = "<vn>"
 
     seed = 42
     train_dataset_vn, dev_dataset_vn = preprocessing.test_split(vn_train_dataset, random_state=seed)
@@ -367,6 +372,9 @@ def main():
     train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_cn])
     dev_df      = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_cn])
 
+    if not args.lang_token:
+        train_df["rerank"] = train_df.rerank.apply(literal_eval)
+        dev_df["rerank"] = dev_df.rerank.apply(literal_eval)
 
     # tmp = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en])
     df_wo_cn    = train_df.head(len(train_df) - len(train_dataset_cn))
@@ -381,6 +389,8 @@ def main():
         raise Exception("Please specify arg --eval-input-file to read eval dataset from")
     preprocessing.save_to_json(dev_df, dev_df.columns, fname=args.eval_input_file)
     
+    return 
+
     if args.lang_token:
         freq_df = exploration.get_freq_df(train_df, dev_df)
         exploration.plot_freq(freq_df)
