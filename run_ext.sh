@@ -9,12 +9,12 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-dev_dir="dev_$fname.json"
+dev_dir=$fname\/dev_$fname.json
 pushd /ukp-storage-1/tran/acl23doc2dial/ &&\
 export HOME=/ukp-storage-1/tran//acl23doc2dial/ &&\
 echo "== START TRAINING ==" &&\
 echo "== \W EXTENDED DATASET =="
-echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved to: \"$fname/\""
+echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved as: \"$dev_dir\""
 
 if [[ $lang_token -eq 1 ]]
 then
@@ -27,12 +27,19 @@ fi
 echo "train_generation finished..." &&\
 
 echo "== START INFERENCE ==" &&\
-if [[ $lang_token -eq 1 ]]
-then
-    python /ukp-storage-1/tran/acl23doc2dial/inference_generation.py --cache-dir=$fname --extended-dataset --eval-input-file=dev_dir --lang-token
-else
-    python /ukp-storage-1/tran/acl23doc2dial/inference_generation.py --cache-dir=$fname --extended-dataset --eval-input-file=dev_dir
-fi
+declare -a arr=("<fr> <vn>" "<fr>" "<vn>" "<en> <cn>" "<en>" "<cn>")
+
+for i in "${arr[@]}"
+do
+   echo "== START INFERENCE ON $i"
+
+   if [[ $lang_token -eq 1 ]]
+   then
+        python /ukp-storage-1/tran/acl23doc2dial/inference_generation.py --cache-dir=$fname --extended-dataset --eval-input-file=$dev_dir --lang-token --eval-lang $i
+   else
+        python /ukp-storage-1/tran/acl23doc2dial/inference_generation.py --cache-dir=$fname --extended-dataset --eval-input-file=$dev_dir --eval-lang $i
+   fi        
+done
 
 echo "inference_generation finished..." &&\
 popd
