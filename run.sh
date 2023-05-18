@@ -10,7 +10,7 @@ while [ $# -gt 0 ]; do
 done
 
 dev_dir=$fname\/dev_$fname.json
-declare -a arr=("<fr> <vn>" "<fr>" "<vn>" "<en> <cn>" "<en>" "<cn>")
+declare -a arr=("<fr> <vn>" "<fr>" "<vn>")
 
 pushd /ukp-storage-1/tran/acl23doc2dial/ &&\
 export HOME=/ukp-storage-1/tran//acl23doc2dial/ &&\
