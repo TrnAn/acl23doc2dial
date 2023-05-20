@@ -7,7 +7,14 @@
 
 ## Run as `SBATCH`
 ```bash
-bash slurm_script_kwargs.sh --extended 1 --lang_token 1 --fname ext_lang_token --per_gpu_batch_size 4
+# running train + inference /wo extended dataset en+cn
+bash slurm_script_kwargs.sh --extended 0 --lang_token 1 --fname lang_token --per_gpu_batch_size 1 
+# running train + inference /w extended dataset en+cn
+bash slurm_script_kwargs.sh --extended 1 --lang_token 1 --fname lang_token --per_gpu_batch_size 1 
+# only running inference
+bash slurm_script_kwargs.sh --extended 0 --lang_token 1 --fname lang_token --per_gpu_batch_size 1 --only_inference 1
+# only running train
+bash slurm_script_kwargs.sh --extended 0 --lang_token 1 --fname lang_token --per_gpu_batch_size 1 --only_train 1
 ```
 
 ## Start `SRUN` 
