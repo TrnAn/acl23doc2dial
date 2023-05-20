@@ -17,7 +17,7 @@ pushd /ukp-storage-1/tran/acl23doc2dial/ &&\
 export HOME=/ukp-storage-1/tran//acl23doc2dial/ &&\
 echo "== START TRAINING ==" 
 echo "== \WO EXTENDED DATASET =="
-echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved as: \"$dev_dir\""
+echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved as: \"$dev_dir\" (3) inference only: "$only_inference""
 if [[ $lang_token -eq 1 ]]
 then
     if [[ $only_inference -eq 0 ]]
@@ -31,7 +31,7 @@ then
         echo "train_generation finished..." 
     fi
 
-    if [[ $only_train -eq 0]]
+    if [[ $only_train -eq 0 ]]
     then
         for i in "${arr[@]}"
         do
@@ -44,7 +44,6 @@ then
             echo "inference_generation finished..."
         done
     fi
-
 else
     if [[ $only_inference -eq 0 ]]
     then

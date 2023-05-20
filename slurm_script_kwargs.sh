@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# set default 
-only_train      = 0
-only_inference  = 0
+# set default
+only_train=0
+only_inference=0
 
 while [ $# -gt 0 ]; do
     if [[ $1 == "--"* ]]; then
