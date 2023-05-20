@@ -14,8 +14,7 @@ pushd /ukp-storage-1/tran/acl23doc2dial/ &&\
 export HOME=/ukp-storage-1/tran//acl23doc2dial/ &&\
 echo "== START TRAINING ==" &&\
 echo "== \W EXTENDED DATASET =="
-echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved as: \"$dev_dir\""
-
+echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved as: \"$dev_dir\" (3) inference only: $only_inference (4) train_only: $only_train"
 
 if [[ $only_inference -eq 0 ]]
 then

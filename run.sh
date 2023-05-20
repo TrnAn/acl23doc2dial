@@ -1,6 +1,5 @@
 #!/bin/bash
 #
-
 while [ $# -gt 0 ]; do
     if [[ $1 == "--"* ]]; then
         v="${1/--/}"
@@ -17,7 +16,7 @@ pushd /ukp-storage-1/tran/acl23doc2dial/ &&\
 export HOME=/ukp-storage-1/tran//acl23doc2dial/ &&\
 echo "== START TRAINING ==" 
 echo "== \WO EXTENDED DATASET =="
-echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved as: \"$dev_dir\" (3) inference only: "$only_inference""
+echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved as: \"$dev_dir\" (3) inference only: $only_inference (4) train_only: $only_train"
 if [[ $lang_token -eq 1 ]]
 then
     if [[ $only_inference -eq 0 ]]
