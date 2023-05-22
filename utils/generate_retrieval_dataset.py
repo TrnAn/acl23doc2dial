@@ -12,6 +12,7 @@ random.seed(42)
 #%%
 cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
 en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
+
 #%%
 en_train_dataset["passages"] = en_train_dataset.passages.apply(literal_eval)
 cn_train_dataset["passages"] = cn_train_dataset.passages.apply(literal_eval)
@@ -178,6 +179,8 @@ en_merged_not_domain['negative'] = en_merged_not_domain.apply(lambda x: random_f
 
 #%%
 en_merged['positive']               = en_merged.passages.str[0]
+
+#%%
 en_merged_not_domain['positive']    = en_merged_not_domain.passages.str[0]
 
 #%%
@@ -185,3 +188,46 @@ en_merged[["query", "passages", "response", "positive", "negative"]].to_json("en
 
 #%%
 en_merged_not_domain[["query", "passages", "response", "positive", "negative"]].to_json("en_train_dataset_retrieval_generation_other_domain.json", lines=True, orient="records")
+
+#%%
+# SAVE TO ALL_PASSAGES
+
+en_flattened_list  = en_merged.explode('passages').passages.tolist()
+
+# Save the JSON data to a file
+with open('all_passages\\en.json', 'w') as file:
+    json.dump(en_flattened_list, file, indent=4)
+    file.write('\n') 
+
+#%%
+cn_flattened_list  = cn_merged_in_domain.explode('passages').passages.tolist()
+
+# Save the JSON data to a file
+with open('all_passages\\cn.json', 'w') as file:
+    json.dump(cn_flattened_list, file, indent=4, ensure_ascii=False)
+    file.write('\n') 
+
+#%%
+# Your existing JSON string
+# Read the JSON string from a file
+pdir = "all_passages\\id_to_passage.json"
+with open(pdir, 'r') as file:
+    json_str = file.read()
+
+# Parse the JSON string into a dictionary
+data = json.loads(json_str)
+
+# Find the highest existing key and increment it by one
+new_key = max(map(int, data.keys())) + 1
+
+# Add new key-value pair
+for passage in en_flattened_list + cn_flattened_list:
+    data[f"{new_key}"] = passage
+    new_key += 1
+
+# Convert the updated dictionary back to JSON string
+updated_json_str = json.dumps(data, indent=4, ensure_ascii=False)
+print(updated_json_str)
+
+with open("all_passages\\id_to_passage_tmp.json", 'w') as file:
+    file.write(updated_json_str)
