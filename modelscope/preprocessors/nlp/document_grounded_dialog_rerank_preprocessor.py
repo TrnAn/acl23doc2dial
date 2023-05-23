@@ -45,6 +45,7 @@ class DocumentGroundedDialogRerankPreprocessor(Preprocessor):
             query = data['input']
             passages = data['passages']
             ids = data['id']
+            lang = data['lang']
             output = data['output']
             positive_pids = data['positive_pids']
             preprocess_output_list = []
@@ -54,6 +55,7 @@ class DocumentGroundedDialogRerankPreprocessor(Preprocessor):
                 now_id = ids[index]
                 now_output = eval(output[index])
                 now_positive_pids = eval(positive_pids[index])
+                now_lang = lang[index]
                 # query
                 query_ids = self.tokenizer(
                     [now_query], add_special_tokens=False,
@@ -85,7 +87,9 @@ class DocumentGroundedDialogRerankPreprocessor(Preprocessor):
                     'passages':
                     now_passages,
                     'query':
-                    now_query
+                    now_query,
+                    'lang':
+                    now_lang
                 })
             return preprocess_output_list
         else:

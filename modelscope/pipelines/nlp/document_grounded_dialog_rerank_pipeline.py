@@ -104,6 +104,7 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                                           jobj['attention_mask'])
                 passages = jobj['passages']
                 query = jobj['query']
+                lang = jobj["lang"] # add language info
                 answer = jobj['output'][0]['answer']
               
                 scored_pids = [(p['pid'], prob)
@@ -119,6 +120,8 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                     query,
                     'scored_pids':
                     scored_pids,
+                    'lang': 
+                    lang,
                     'output': [{
                         'answer':
                         answer, #'',
