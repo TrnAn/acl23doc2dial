@@ -418,7 +418,7 @@ def main():
         args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_batch_size)
 
     print(f"BATCH SIZE: {args.per_gpu_batch_size}")
-    train(trainer, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=1, learning_rate=1e-4)
+    train(trainer, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 
