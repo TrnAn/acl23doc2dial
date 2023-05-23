@@ -62,11 +62,11 @@ def main():
     train_dataset   = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn]) 
     dev_dataset     = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
-    if args.extended_dataset and not bool(args.only_english):
-        df_wo_cn    = train_dataset.head(len(train_dataset) - len(train_dataset_cn))
-        max_len     = len(max(sum(df_wo_cn.rerank.tolist(), []), key=len))
-        train_dataset["rerank"]  = train_dataset.rerank.apply(lambda s: [x[:max_len] for x in s])
-        dev_dataset["rerank"]    = dev_dataset.rerank.apply(lambda s: [x[:max_len] for x in s])
+    # if args.extended_dataset and not bool(args.only_english):
+    #     df_wo_cn    = train_dataset.head(len(train_dataset) - len(train_dataset_cn))
+    #     max_len     = len(max(sum(df_wo_cn.rerank.tolist(), []), key=len))
+    #     train_dataset["rerank"]  = train_dataset.rerank.apply(lambda s: [x[:max_len] for x in s])
+    #     dev_dataset["rerank"]    = dev_dataset.rerank.apply(lambda s: [x[:max_len] for x in s])
     
     preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname=args.eval_input_file, dir=args.cache_dir)
 
