@@ -386,7 +386,8 @@ def main():
     # truncate passages
     if args.extended_dataset and not bool(args.only_english):
         df_wo_cn    = train_df.head(len(train_df) - len(train_dataset_cn))
-        max_len     = len(max(sum(df_wo_cn.rerank.tolist(), []), key=len))
+        # max_len     = len(max(sum(df_wo_cn["rerank"].tolist(), []), key=len))
+        max_len = max(len(string) for lst in df_wo_cn["rerank"] for string in lst)
         train_df["rerank"]  = train_df.rerank.apply(lambda s: [x[:max_len] for x in s])
         dev_df["rerank"]    = dev_df.rerank.apply(lambda s: [x[:max_len] for x in s])
 
@@ -417,7 +418,7 @@ def main():
         args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_batch_size)
 
     print(f"BATCH SIZE: {args.per_gpu_batch_size}")
-    train(trainer, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
+    train(trainer, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=1, learning_rate=1e-4)
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 
