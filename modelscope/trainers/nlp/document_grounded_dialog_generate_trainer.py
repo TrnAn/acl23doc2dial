@@ -3,7 +3,7 @@ import os
 import re
 import string
 from collections import Counter
-
+from torchsummary import summary
 import json
 import sacrebleu
 import torch
@@ -164,6 +164,7 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
 
     def __init__(self, model: str, revision='v1.0.0', *args, **kwargs):
         self.model = Model.from_pretrained(model, revision=revision)
+        print(summary(self.model.model))
         self.preprocessor = DocumentGroundedDialogGeneratePreprocessor(
             model_dir=self.model.model_dir, lang_token=kwargs["lang_token"])
         self.device = self.preprocessor.device

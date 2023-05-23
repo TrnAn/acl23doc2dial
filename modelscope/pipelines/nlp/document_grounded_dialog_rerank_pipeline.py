@@ -102,7 +102,6 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                 inst_id = jobj['id']
                 probs = self.one_instance(jobj['input_ids'],
                                           jobj['attention_mask'])
-                print(f"{jobj=}")
                 passages = jobj['passages']
                 query = jobj['query']
                 answer = jobj['output'][0]['answer']
