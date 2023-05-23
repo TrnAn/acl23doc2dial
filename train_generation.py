@@ -169,7 +169,7 @@ def measure_result(result_dict):
 
 
 def train(trainer,
-          total_epoches=10,
+          total_epoches=1, #10,
           batch_size=16,
           accumulation_steps=1,
           learning_rate=1e-4,
@@ -323,6 +323,8 @@ def main():
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 16)
     parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 16)
     parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--only-english", help= "Run experiments only on English dataset", type= int, default=0)
+    parser.add_argument("--only-chinese", help= "Run experiments only on Chinese dataset", type= int, default=0)
     parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
     parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
@@ -333,23 +335,28 @@ def main():
     # read in English + Chinese dataset
     en_train_dataset, cn_train_dataset = None, None
     if args.extended_dataset:
-        cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
-        en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
-        cn_train_dataset = cn_train_dataset.rename({"passages": "rerank"},  axis='columns')
-        en_train_dataset = en_train_dataset.rename({"passages": "rerank"},  axis='columns')
+        if not bool(args.only_chinese):
+            en_train_dataset = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
+            # n = int(len(en_train_dataset) * 0.7)  # Number of samples to select, 75% of the DataFrame
+            # en_train_dataset = en_train_dataset.sample(n=n, random_state = 42)
+            en_train_dataset["lang"] = "en"
+            en_train_dataset = en_train_dataset.rename({"passages": "rerank"},  axis='columns')
+  
+        if not bool(args.only_english):
+            cn_train_dataset = pd.read_json("cn_train_dataset_in_domain.json", lines=True)
+            cn_train_dataset["lang"] = "cn"
+            cn_train_dataset = cn_train_dataset.rename({"passages": "rerank"},  axis='columns')
 
-        cn_train_dataset["lang"] = "<cn>"
-        en_train_dataset["lang"] = "<en>"
-        # if not args.lang_token:
-        #     # cn_train_dataset["rerank"] = cn_train_dataset.rerank.apply(lambda s: json.loads(s))
-        #     cn_train_dataset["rerank"] = cn_train_dataset.rerank.apply(literal_eval)
+
+        # cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
+        # en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
     
     # read in Vietnamese + French dataset
     fr_train_dataset = preprocessing.read('DAMO_ConvAI/FrDoc2BotGeneration')
     vn_train_dataset = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')
 
-    fr_train_dataset["lang"] = "<fr>"
-    vn_train_dataset["lang"] = "<vn>"
+    fr_train_dataset["lang"] = "fr"
+    vn_train_dataset["lang"] = "vi"
 
     seed = 42
     train_dataset_vn, dev_dataset_vn = preprocessing.test_split(vn_train_dataset, random_state=seed)
@@ -360,42 +367,41 @@ def main():
 
     if args.lang_token:
         train_dataset_fr      = preprocessing.add_lang_token(train_dataset_fr, "fr", ["query", "rerank"]) 
-        train_dataset_vn      = preprocessing.add_lang_token(train_dataset_vn, "vn", ["query", "rerank"]) 
+        train_dataset_vn      = preprocessing.add_lang_token(train_dataset_vn, "vi", ["query", "rerank"]) 
         train_dataset_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "rerank"]) 
         train_dataset_cn      = preprocessing.add_lang_token(train_dataset_cn, "cn", ["query", "rerank"]) 
 
         dev_dataset_fr = preprocessing.add_lang_token(dev_dataset_fr, "fr", ["query", "rerank"]) 
-        dev_dataset_vn = preprocessing.add_lang_token(dev_dataset_vn, "vn", ["query", "rerank"]) 
+        dev_dataset_vn = preprocessing.add_lang_token(dev_dataset_vn, "vi", ["query", "rerank"]) 
         dev_dataset_en = preprocessing.add_lang_token(dev_dataset_en, "en", ["query", "rerank"]) 
         dev_dataset_cn = preprocessing.add_lang_token(dev_dataset_cn, "cn", ["query", "rerank"]) 
 
-    train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_cn])
-    dev_df      = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_cn])
+    train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn])
+    dev_df      = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
-    if not args.lang_token:
-        train_df["rerank"] = train_df.rerank.apply(literal_eval)
-        dev_df["rerank"] = dev_df.rerank.apply(literal_eval)
+    # if not args.lang_token:
+    #     train_df["rerank"]  = train_df.rerank.apply(literal_eval)
+    #     dev_df["rerank"]    = dev_df.rerank.apply(literal_eval)
 
-    # tmp = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en])
-    df_wo_cn    = train_df.head(len(train_df) - len(train_dataset_cn))
-    max_len     = len(max(sum(df_wo_cn.rerank.tolist(), []), key=len))
-    train_df["rerank"]  = train_df.rerank.apply(lambda s: [x[:max_len] for x in s])
-    dev_df["rerank"]    = dev_df.rerank.apply(lambda s: [x[:max_len] for x in s])
+    # truncate passages
+    if args.extended_dataset and not bool(args.only_english):
+        df_wo_cn    = train_df.head(len(train_df) - len(train_dataset_cn))
+        max_len     = len(max(sum(df_wo_cn.rerank.tolist(), []), key=len))
+        train_df["rerank"]  = train_df.rerank.apply(lambda s: [x[:max_len] for x in s])
+        dev_df["rerank"]    = dev_df.rerank.apply(lambda s: [x[:max_len] for x in s])
 
-    # max_len = tmp.rerank.str.len().max()
-    # train_df["rerank"] = train_df["rerank"].apply(lambda x: literal_eval(x)[:max_len] if args.lang_token else json.dumps(literal_eval(x)[:max_len])) 
 
     if args.eval_input_file is None:
         raise Exception("Please specify arg --eval-input-file to read eval dataset from")
-    preprocessing.save_to_json(dev_df, dev_df.columns, fname=args.eval_input_file)
-    
-    return 
+    # preprocessing.save_to_json(dev_df, dev_df.columns, fname=args.eval_input_file)
+    preprocessing.save_to_json(dev_df, dev_df.columns, fname="test.json", dir=args.cache_dir)
 
     if args.lang_token:
         freq_df = exploration.get_freq_df(train_df, dev_df)
         exploration.plot_freq(freq_df)
 
-    with open('all_passages/id_to_passage.json') as f:
+    parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"
+    with open(f'{parent_dir}/id_to_passage.json') as f:
         id_to_passage = json.load(f)
 
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir=args.cache_dir)
