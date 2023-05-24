@@ -1,2 +1,0 @@
---cache-dir=lang_token_ext_ds
---lang-token
