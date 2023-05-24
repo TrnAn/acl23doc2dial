@@ -10,11 +10,22 @@
 # running train + inference /wo extended dataset en+cn
 bash slurm_script_kwargs.sh --extended 0 --lang_token 1 --fname lang_token --per_gpu_batch_size 1 
 # running train + inference /w extended dataset en+cn
-bash slurm_script_kwargs.sh --extended 1 --lang_token 1 --fname lang_token --per_gpu_batch_size 1 
+bash slurm_script_kwargs.sh --extended 1 --lang_token 1 --fname ext_lang_token --per_gpu_batch_size 1 
 # only running inference
 bash slurm_script_kwargs.sh --extended 0 --lang_token 1 --fname lang_token --per_gpu_batch_size 1 --only_inference 1
 # only running train
-bash slurm_script_kwargs.sh --extended 0 --lang_token 1 --fname lang_token --per_gpu_batch_size 1 --only_train 1
+bash slurm_script_kwargs.sh --extended 0 --lang_token 0 --fname no_lang_token --per_gpu_batch_size 1 --only_train 1
+
+# running experiments on both english & chinese datasets
+bash slurm_script_kwargs.sh --extended 1 --lang_token 1 --fname en_ext_lang_token --per_gpu_batch_size 1
+
+# running experiments on english dataset
+bash slurm_script_kwargs.sh --extended 1 --lang_token 1 --fname en_ext_lang_token --per_gpu_batch_size 1 --only_english 1
+bash slurm_script_kwargs.sh --extended 1 --lang_token 0 --fname en_ext_no_lang_token --per_gpu_batch_size 1 --only_english 1
+
+# running experiments on chinese dataset
+bash slurm_script_kwargs.sh --extended 1 --lang_token 1 --fname cn_ext_lang_token --per_gpu_batch_size 1 --only_chinese 1
+bash slurm_script_kwargs.sh --extended 1 --lang_token 0 --fname cn_ext_no_lang_token --per_gpu_batch_size 1 --only_chinese 1
 ```
 
 ## Start `SRUN` 
