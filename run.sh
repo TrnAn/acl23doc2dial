@@ -35,7 +35,7 @@ then
         for i in "${arr[@]}"
         do
             echo "== START INFERENCE on $i ==" &&\
-            python /ukp-storage-1/$user/acl23doc2dial/inference_retrieval.py --batch-accumulation --cache-dir=$fname --eval-input-file=$dev_dir --lang-token --eval-lang $i &&\
+            python /ukp-storage-1/$user/acl23doc2dial/inference_retrieval.py --cache-dir=$fname --eval-input-file=$dev_dir --lang-token --eval-lang $i &&\
             echo "inference_retrieval finished..." &&\
             python /ukp-storage-1/$user/acl23doc2dial/inference_rerank.py --cache-dir=$fname --eval-input-file=$dev_dir --lang-token --eval-lang $i &&\
             echo "inference_rerank finished..." &&\
@@ -47,7 +47,7 @@ else
     if [[ $only_inference -eq 0 ]]
     then
         echo "\wo language token"
-        python /ukp-storage-1/$user/acl23doc2dial/train_retrieval.py --cache-dir=$fname --eval-input-file=$dev_dir &&\
+        python /ukp-storage-1/$user/acl23doc2dial/train_retrieval.py --batch-accumulation --cache-dir=$fname --eval-input-file=$dev_dir &&\
         echo "train_retrieval finished..." &&\
         python /ukp-storage-1/$user/acl23doc2dial/train_rerank.py  --cache-dir=$fname &&\
         echo "train_rerank finished..." &&\
