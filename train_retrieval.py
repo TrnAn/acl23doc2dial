@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 128)
-    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 32)
+    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 16)
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
     parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
 
