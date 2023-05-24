@@ -87,7 +87,12 @@ cn_merged_in_domain["positive"]     = cn_merged_in_domain.passages.str[0]
 cn_merged_other_domain["positive"]  = cn_merged_other_domain.passages.str[0]
 
 #%%
-cn_merged_in_domain.columns
+cn_merged_in_domain.head()
+
+#%%
+cn_merged_in_domain["passages"] = cn_merged_in_domain["passages"].apply(lambda x: json.dumps(x, ensure_ascii=False))
+cn_merged_other_domain["passages"] = cn_merged_other_domain["passages"].apply(lambda x: json.dumps(x, ensure_ascii=False))
+
 #%%
 cn_merged_in_domain[["query", "passages", "response", "negative", "positive"]].to_json("cn_train_dataset_in_domain.json", orient="records", lines=True, force_ascii=False)
 
@@ -178,11 +183,21 @@ en_merged['negative'] = en_merged.apply(lambda x: random_first_passage(en_merged
 en_merged_not_domain['negative'] = en_merged_not_domain.apply(lambda x: random_first_passage(en_merged_not_domain, x, same_domain=False), axis=1)
 
 #%%
-en_merged['positive']               = en_merged.passages.str[0]
+en_merged['positive'] = en_merged.passages.str[0]
 
 #%%
-en_merged_not_domain['positive']    = en_merged_not_domain.passages.str[0]
+en_merged_not_domain['positive'] = en_merged_not_domain.passages.str[0]
 
+#%%
+n = int(len(en_merged) * 0.7)  # Number of samples to select, 75% of the DataFrame
+en_merged = en_merged.sample(n=n, random_state = 42)
+
+#%%
+en_merged["passages"] = en_merged["passages"].apply(lambda x: json.dumps(x, ensure_ascii=False))
+en_merged_not_domain["passages"] = en_merged_not_domain["passages"].apply(lambda x: json.dumps(x, ensure_ascii=False))
+
+#%%
+en_merged.head()
 #%%
 en_merged[["query", "passages", "response", "positive", "negative"]].to_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True, orient="records")
 
@@ -229,5 +244,42 @@ for passage in en_flattened_list + cn_flattened_list:
 updated_json_str = json.dumps(data, indent=4, ensure_ascii=False)
 print(updated_json_str)
 
-with open("all_passages\\id_to_passage_tmp.json", 'w') as file:
+with open(pdir, 'w') as file:
     file.write(updated_json_str)
+
+
+#%%
+import json
+import os
+from tqdm import tqdm
+directory = "all_passages\\lang_token\\"
+if not os.path.exists(directory):
+    os.makedirs(directory)
+
+
+combined_data = {}
+
+languages = ["fr", "vi", "en", "cn"]
+# Iterate over the JSON files
+index = 0
+for lang in tqdm(languages):
+        lang_values = []
+        with open(f"all_passages\\{lang}.json", "r") as file:
+            json_data = json.load(file)
+            print(json_data, flush=True)
+            for val in json_data:
+                formatted_value = f"<{lang}> {val}"
+                combined_data[str(index)] = formatted_value
+                lang_values += [formatted_value]
+                index += 1
+            with open(f"{directory}{lang}.json", "w") as file:
+                json.dump(lang_values, file, indent=4, ensure_ascii=False)
+#         # Add the array of strings to the combined data dictionary
+#             combined_data[str(index)] = json_data
+
+# Save the combined data as a new JSON file
+output_file = f"{directory}id_to_passage.json"
+with open(output_file, "w") as file:
+    json.dump(combined_data, file, indent=4, ensure_ascii=False)
+
+print("Combined data saved to", output_file)
