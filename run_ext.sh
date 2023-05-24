@@ -10,8 +10,8 @@ while [ $# -gt 0 ]; do
 done
 
 dev_dir=$fname\/dev_$fname.json
-pushd /ukp-storage-1/tran/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/tran//acl23doc2dial/ &&\
+# pushd /ukp-storage-1/tran/acl23doc2dial/ &&\
+# export HOME=/ukp-storage-1/tran//acl23doc2dial/ &&\
 echo "== START TRAINING ==" &&\
 echo "== \W EXTENDED DATASET =="
 echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved as: \"$dev_dir\" (3) inference only: $only_inference (4) train_only: $only_train"
@@ -75,4 +75,4 @@ then
     done
 echo "inference_generation finished..."
 fi
-popd
+# popd
