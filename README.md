@@ -15,7 +15,6 @@
 ├── requirements.txt              
 ├── run.sh                        # run experiments /wo extended datasets: fr, vn
 ├── run_ext.sh                    # run experiments /w extended datasets: en, cn
-├── slurm_script.sh               # run commit slurm job
 ├── slurm_script_kwargs.sh        # commit slurm job
 ├── train_generation.py           
 ├── train_rerank.py
