@@ -42,10 +42,10 @@ export HOME=/ukp-storage-1/$user//acl23doc2dial/ &&\
 if [[ $extended -eq 1 ]]
 then
     echo "run script /w extended datasets..."
-    bash /ukp-storage-1/$user/acl23doc2dial/run_ext.sh --lang_token $lang_token --fname $fname --per_gpu_batch_size $per_gpu_batch_size --only_train $only_train --only_inference $only_inference --only_english $only_english --only_chinese $only_chinese
+    bash /ukp-storage-1/$user/acl23doc2dial/run_ext.sh --user $user --lang_token $lang_token --fname $fname --per_gpu_batch_size $per_gpu_batch_size --only_train $only_train --only_inference $only_inference --only_english $only_english --only_chinese $only_chinese
 else
     echo "run script /wo extended datasets..."
-    bash /ukp-storage-1/$user/acl23doc2dial/run.sh --lang_token $lang_token --fname $fname --per_gpu_batch_size $per_gpu_batch_size --only_train $only_train --only_inference $only_inference
+    bash /ukp-storage-1/$user/acl23doc2dial/run.sh --user $user --lang_token $lang_token --fname $fname --per_gpu_batch_size $per_gpu_batch_size --only_train $only_train --only_inference $only_inference
 fi
 popd
 exit 0

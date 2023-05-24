@@ -10,8 +10,8 @@ while [ $# -gt 0 ]; do
 done
 
 dev_dir=$fname\/dev_$fname.json
-# pushd /ukp-storage-1/tran/acl23doc2dial/ &&\
-# export HOME=/ukp-storage-1/tran//acl23doc2dial/ &&\
+# pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
+# export HOME=/ukp-storage-1/$user//acl23doc2dial/ &&\
 echo "== START TRAINING ==" &&\
 echo "== \W EXTENDED DATASET =="
 echo "output saved to (1) cache dir: \"$fname/\" (2) dev set saved as: \"$dev_dir\" (3) inference only: $only_inference (4) train_only: $only_train"
@@ -21,19 +21,19 @@ then
     if [[ $lang_token -eq 1 ]]
     then
         echo "started train \w language token" &&\
-        python /ukp-storage-1/tran/acl23doc2dial/train_retrieval.py --extended-dataset --batch-accumulation --cache-dir=$fname --lang-token --eval-input-file=$dev_dir --only-chinese=$only_chinese --only-english=$only_english &&\
+        python /ukp-storage-1/$user/acl23doc2dial/train_retrieval.py --extended-dataset --batch-accumulation --cache-dir=$fname --lang-token --eval-input-file=$dev_dir --only-chinese=$only_chinese --only-english=$only_english &&\
         echo "train_retrieval finished..." &&\
-        python /ukp-storage-1/tran/acl23doc2dial/train_rerank.py  --extended-dataset --cache-dir=$fname --lang-token &&\
+        python /ukp-storage-1/$user/acl23doc2dial/train_rerank.py  --extended-dataset --cache-dir=$fname --lang-token &&\
         echo "train_rerank finished..." &&\
-        python /ukp-storage-1/tran/acl23doc2dial/train_generation.py --extended-dataset --cache-dir=$fname --batch-accumulation --per-gpu-batch-size=$per_gpu_batch_size --eval-input-file=$dev_dir --lang-token --only-chinese=$only_chinese --only-english=$only_english&&\
+        python /ukp-storage-1/$user/acl23doc2dial/train_generation.py --extended-dataset --cache-dir=$fname --batch-accumulation --per-gpu-batch-size=$per_gpu_batch_size --eval-input-file=$dev_dir --lang-token --only-chinese=$only_chinese --only-english=$only_english&&\
         echo "train_generation finished..." 
     else
         echo "started train \wo language token" &&\
-        python /ukp-storage-1/tran/acl23doc2dial/train_retrieval.py --extended-dataset --batch-accumulation --cache-dir=$fname --eval-input-file=$dev_dir --only-chinese=$only_chinese --only-english=$only_english &&\
+        python /ukp-storage-1/$user/acl23doc2dial/train_retrieval.py --extended-dataset --batch-accumulation --cache-dir=$fname --eval-input-file=$dev_dir --only-chinese=$only_chinese --only-english=$only_english &&\
         echo "train_retrieval finished..." &&\
-        python /ukp-storage-1/tran/acl23doc2dial/train_rerank.py  --extended-dataset --cache-dir=$fname &&\
+        python /ukp-storage-1/$user/acl23doc2dial/train_rerank.py  --extended-dataset --cache-dir=$fname &&\
         echo "train_rerank finished..." &&\
-        python /ukp-storage-1/tran/acl23doc2dial/train_generation.py --extended-dataset --cache-dir=$fname --batch-accumulation --per-gpu-batch-size=$per_gpu_batch_size --eval-input-file=$dev_dir --only-chinese=$only_chinese --only-english=$only_english&&\
+        python /ukp-storage-1/$user/acl23doc2dial/train_generation.py --extended-dataset --cache-dir=$fname --batch-accumulation --per-gpu-batch-size=$per_gpu_batch_size --eval-input-file=$dev_dir --only-chinese=$only_chinese --only-english=$only_english&&\
         echo "train_generation finished..." 
     fi
 fi
@@ -60,17 +60,17 @@ then
         echo "== START INFERENCE on $i =="
         if [[ $lang_token -eq 1 ]]
         then
-                python /ukp-storage-1/tran/acl23doc2dial/inference_retrieval.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --lang-token --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english &&\
+                python /ukp-storage-1/$user/acl23doc2dial/inference_retrieval.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --lang-token --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english &&\
                 echo "inference_retrieval finished..." &&\
-                python /ukp-storage-1/tran/acl23doc2dial/inference_rerank.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --lang-token --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english &&\
+                python /ukp-storage-1/$user/acl23doc2dial/inference_rerank.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --lang-token --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english &&\
                 echo "inference_rerank finished..." &&\
-                python /ukp-storage-1/tran/acl23doc2dial/inference_generation.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --lang-token --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english
+                python /ukp-storage-1/$user/acl23doc2dial/inference_generation.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --lang-token --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english
         else
-                python /ukp-storage-1/tran/acl23doc2dial/inference_retrieval.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english &&\
+                python /ukp-storage-1/$user/acl23doc2dial/inference_retrieval.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english &&\
                 echo "inference_retrieval finished..." &&\
-                python /ukp-storage-1/tran/acl23doc2dial/inference_rerank.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english &&\
+                python /ukp-storage-1/$user/acl23doc2dial/inference_rerank.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english &&\
                 echo "inference_rerank finished..." &&\
-                python /ukp-storage-1/tran/acl23doc2dial/inference_generation.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english
+                python /ukp-storage-1/$user/acl23doc2dial/inference_generation.py --extended-dataset --cache-dir=$fname --eval-input-file=$dev_dir --eval-lang $i --only-chinese=$only_chinese --only-english=$only_english
         fi        
     done
 echo "inference_generation finished..."
