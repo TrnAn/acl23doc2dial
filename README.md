@@ -36,7 +36,12 @@
     --lang_token                Enable usage of additional language token <lang> 
     --per_gpu_batch_size        Specify batch size that fits into given GPU VRAM
     --fname                     Specify the cache directory and dev set filename (i.e., dev_$fname.json)
-  
+    --user                      Specify user (used to specify paths)
+    --only_train                Toggle if only training scripts shall be running
+    --only_inference            Toggle if only inference scripts shall be running
+    --only_english              If extended is set to 1; only add English dataset to experimental setting, add both en + cn otherwise
+    --only_chinese              If extended is set to 1; only add Chinese dataset to experimental setting, add both en + cn otherwise
+    
   Example usage
   # \w language token and \wo extended datasets, i.e., only the French and Vietnamese datasets
   bash slurm_script_kwargs.sh --extended 0 --lang_token 1 --fname lang_token --per_gpu_batch_size 1
