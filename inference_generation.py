@@ -32,7 +32,8 @@ def main():
                 'query': sample['input'],
                 'rerank': json.dumps([id_to_passage[x['wikipedia_id']] for x in sample['output'][0]['provenance']],
                                     ensure_ascii=False),
-                'response': sample['output'][0]['answer'] #'<response> @'
+                'response': sample['output'][0]['answer'], #'<response> @'
+                'lang': sample["lang"]
             })
 
     cache_path = f'{args.cache_dir}/DAMO_ConvAI/nlp_convai_generation_pretrain'
@@ -53,7 +54,9 @@ def main():
         for query, prediction in zip(eval_dataset, predictions):
             f.write(json.dumps({
                 'query': query['query'],
-                'response': prediction.replace('<response>','').strip()
+                'gold_response': query['response'],
+                'response': prediction.replace('<response>','').strip(),
+                'lang': query['lang']
             }, ensure_ascii=False) + '\n')
 
 

@@ -20,7 +20,7 @@ def main():
     parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 128)
-    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 16)
+    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 1)
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
     parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
 
@@ -67,7 +67,7 @@ def main():
     #     max_len     = len(max(sum(df_wo_cn.rerank.tolist(), []), key=len))
     #     train_dataset["rerank"]  = train_dataset.rerank.apply(lambda s: [x[:max_len] for x in s])
     #     dev_dataset["rerank"]    = dev_dataset.rerank.apply(lambda s: [x[:max_len] for x in s])
-    
+    print(f"{args.eval_input_file=} {args.cache_dir=}")
     preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname=args.eval_input_file, dir=args.cache_dir)
 
     parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"

@@ -321,7 +321,7 @@ def main():
     parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 16)
-    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 16)
+    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 1)
     parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
     parser.add_argument("--only-english", help= "Run experiments only on English dataset", type= int, default=0)
     parser.add_argument("--only-chinese", help= "Run experiments only on Chinese dataset", type= int, default=0)
@@ -395,8 +395,8 @@ def main():
     if args.eval_input_file is None:
         raise Exception("Please specify arg --eval-input-file to read eval dataset from")
     # preprocessing.save_to_json(dev_df, dev_df.columns, fname=args.eval_input_file)
-    preprocessing.save_to_json(dev_df, dev_df.columns, fname="test.json", dir=args.cache_dir)
-
+    # preprocessing.save_to_json(dev_df, dev_df.columns, fname="test.json", dir=args.cache_dir)
+    return 0
     if args.lang_token:
         freq_df = exploration.get_freq_df(train_df, dev_df)
         exploration.plot_freq(freq_df)
