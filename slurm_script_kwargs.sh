@@ -28,7 +28,7 @@ sbatch <<EOT
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
 #SBATCH --mem=64GB
-#SBATCH --constraint="gpu_model:a100|gpu_model:v100|gpu_model:a6000|gpu_model:a180"
+#SBATCH --constraint="gpu_model:a100|gpu_model:a6000|gpu_model:a180"
 #SBATCH --gres=gpu:1
 
 nvidia-smi
@@ -38,7 +38,7 @@ module purge
 module load cuda
 
 pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/$user//acl23doc2dial/ &&\
+export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
 if [[ $extended -eq 1 ]]
 then
     echo "run script /w extended datasets..."
