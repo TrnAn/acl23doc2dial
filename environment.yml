@@ -1,4 +1,4 @@
-name: acl23doc2dial
+name: test
 channels:
   - conda-forge
   - defaults
