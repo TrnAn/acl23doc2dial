@@ -1,0 +1,14 @@
+modelscope==1.3.0
+torch==1.12.1
+tqdm==4.64.1
+sacrebleu==2.2.1
+transformers==4.10.0
+rouge==1.0.1
+torch-summary==1.4.5
+ujson==5.7.0
+sentencepiece==0.1.95
+rouge==1.0.1
+sacrebleu==2.2.1
+matplotlib==3.7.1
+seaborn==0.12.2
+sentencepiece==0.1.95
