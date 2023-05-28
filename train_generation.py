@@ -302,6 +302,7 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
                 skip_special_tokens=True,
                 clean_up_tokenization_spaces=False)
 
+            print(f"{predictions=}; {label=}")
             results['outputs'] += predictions
             results['targets'] += label
         meters = measure_result(results)
@@ -396,7 +397,7 @@ def main():
         raise Exception("Please specify arg --eval-input-file to read eval dataset from")
     # preprocessing.save_to_json(dev_df, dev_df.columns, fname=args.eval_input_file)
     # preprocessing.save_to_json(dev_df, dev_df.columns, fname="test.json", dir=args.cache_dir)
-    return 0
+
     if args.lang_token:
         freq_df = exploration.get_freq_df(train_df, dev_df)
         exploration.plot_freq(freq_df)

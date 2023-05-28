@@ -3,7 +3,13 @@ from modelscope.trainers.nlp.document_grounded_dialog_rerank_trainer import \
     DocumentGroundedDialogRerankTrainer
 from modelscope.utils.constant import DownloadMode
 # from modelscope.hub.snapshot_download import snapshot_download
+from modelscope.trainers.nlp.document_grounded_dialog_retrieval_trainer import \
+    DocumentGroundedDialogRetrievalTrainer
 import argparse
+import json
+import pandas as pd
+import os
+
 
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
@@ -63,11 +69,29 @@ def main():
         download_mode=DownloadMode.FORCE_REDOWNLOAD,
         split='train')
     
+    print(train_dataset)
+    
+    parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"
+    all_passages = []
+    languages = ['fr', 'vi']
+
+    if args.extended_dataset:
+        if not bool(args.only_chinese):
+            languages += ['en']
+        if not bool(args.only_english):
+            languages += ['cn']
+
+    for file_name in languages:
+        with open(f'{parent_dir}/{file_name}.json') as f:
+            all_passages += json.load(f)
+
+    eval_dataset = pd.read_json(args.eval_input_file, lines=True).to_dict('records')
     # cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_ranking_pretrain', cache_dir=args["cache_dir"])
     trainer = DocumentGroundedDialogRerankTrainer(
         model=f'DAMO_ConvAI/nlp_convai_ranking_pretrain', dataset=train_dataset, args=args)
     trainer.train()
 
-
+    cache_path = f'{args.cache_dir}/DAMO_ConvAI/nlp_convai_retrieval_pretrain'
+    
 if __name__ == '__main__':
     main()
