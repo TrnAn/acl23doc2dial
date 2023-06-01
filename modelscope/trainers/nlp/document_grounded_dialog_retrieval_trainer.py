@@ -8,7 +8,7 @@ import torch
 import tqdm
 from torch.utils.data import DataLoader
 from transformers import AdamW, get_scheduler
-
+import itertools
 from modelscope.metainfo import Trainers
 from modelscope.models import Model
 from modelscope.preprocessors import \
@@ -161,7 +161,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
 
             meters = self.evaluate(per_gpu_batch_size=per_gpu_batch_size)
             # total_score = sum([x for x in meters.values()])
-            total_score = sum(np.concatenate(list(meters.values()))) # score on all eval lang combinations
+            total_score = np.sum(np.concatenate(list(meters.values()))) # score on all eval lang combinations
             if total_score >= best_score:
                 best_score = total_score
                 model_path = os.path.join(self.model.model_dir,
@@ -180,10 +180,6 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             state_dict = torch.load(checkpoint_path)
             self.model.model.load_state_dict(state_dict)
 
-        valid_loader = DataLoader(
-            dataset=self.eval_dataset,
-            batch_size=per_gpu_batch_size,
-            collate_fn=collate)
         self.model.model.eval()
         with torch.no_grad():
             all_ctx_vector = []
@@ -204,13 +200,31 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             faiss_index = faiss.IndexFlatIP(all_ctx_vector.shape[-1])
             faiss_index.add(all_ctx_vector) # context -> passages
 
-            results = {'outputs': [], 'targets': []}
+            
+            valid_loader = DataLoader(
+                    dataset=self.eval_dataset,
+                    batch_size=per_gpu_batch_size,
+                    collate_fn=collate)
+  
             all_meters = {}
             for lang in eval_lang:
+                print(f"{lang=}")
+                results = {'outputs': [], 'targets': []}
+                valid_loader = DataLoader(
+                    dataset=self.eval_dataset,
+                    batch_size=per_gpu_batch_size,
+                    collate_fn=collate)
                 for _, payload in enumerate(tqdm.tqdm(valid_loader)):
                     query, positive, negative, curr_lang = payload
-                    if curr_lang not in lang:
+                    if bool(set(curr_lang) & set(lang)) == 0:
                         continue
+
+                    query, positive, negative, curr_lang = zip(*[(q, p, n, l) for q, p, n, l in zip(query, positive, negative, curr_lang) if l in lang])
+                    query = list(query)
+                    positive = list(positive)
+                    negative =list(negative)
+                    curr_lang = list(curr_lang)
+
                     processed = self.preprocessor({'query': query},
                                                 invoke_mode=ModeKeys.INFERENCE)
                     query_vector = self.model.encode_query(
@@ -224,9 +238,11 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 meters = measure_result(results)
                 result_path = os.path.join(self.model.model_dir,
                                         'evaluate_result.json')
+                logger.info(f"{'_'.join(lang)} - {meters}")
+
                 with open(result_path, 'w') as f:
                     json.dump(results, f, ensure_ascii=False, indent=4)
-            all_meters["_".join(eval_lang)] = meters
-            logger.info(f"{lang=} {meters}")
+
+                all_meters["_".join(lang)] = meters
 
         return all_meters

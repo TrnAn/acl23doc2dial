@@ -80,23 +80,23 @@ def main():
         'gradient_accumulation_steps'] = args['full_train_batch_size'] // (
             args['per_gpu_train_batch_size'] * args['world_size'])
     
-    train_dataset_fr = preprocessing.read('DAMO_ConvAI/FrDoc2BotRerank')
-    train_dataset_vi = preprocessing.read('DAMO_ConvAI/ViDoc2BotRerank')
+    train_dataset_fr = MsDataset.load(
+        'DAMO_ConvAI/FrDoc2BotRerank',
+        download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
+        split='train')
+    
+    train_dataset_vi = MsDataset.load(
+        'DAMO_ConvAI/ViDoc2BotRerank',
+        download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
+        split='train')
 
+    train_dataset_fr = pd.DataFrame(list(train_dataset_fr))
+    train_dataset_vi = pd.DataFrame(list(train_dataset_vi))
     train_dataset_fr["lang"] = "fr"
     train_dataset_vi["lang"] = "vi"
-    # train_dataset_fr = MsDataset.load(
-    #     'DAMO_ConvAI/FrDoc2BotRerank',
-    #     download_mode=DownloadMode.FORCE_REDOWNLOAD,
-    #     split='train')
-    
 
     train_dataset_fr, dev_dataset_fr = preprocessing.test_split(train_dataset_fr)
     train_dataset_vi, dev_dataset_vi = preprocessing.test_split(train_dataset_vi)
-    # train_dataset_vi = MsDataset.load(
-    #     'DAMO_ConvAI/ViDoc2BotRerank',
-    #     download_mode=DownloadMode.FORCE_REDOWNLOAD,
-    #     split='train')
 
     # train_dataset_fr, dev_dataset_fr = split_dataset(list(train_dataset_fr))
     # train_dataset_vi, dev_dataset_vi = split_dataset(list(train_dataset_vi))
@@ -116,8 +116,8 @@ def main():
     # for file_name in languages:
     #     with open(f'{parent_dir}/{file_name}.json') as f:
     #         all_passages += json.load(f)
-    train_dataset = train_dataset_fr + train_dataset_vi
-    dev_dataset   = dev_dataset_fr + dev_dataset_vi
+    train_dataset = pd.concat([train_dataset_fr, train_dataset_vi]) 
+    dev_dataset   = pd.concat([dev_dataset_fr, dev_dataset_vi]) 
 
     trainer = DocumentGroundedDialogRerankTrainer(
         model=f'DAMO_ConvAI/nlp_convai_ranking_pretrain', 

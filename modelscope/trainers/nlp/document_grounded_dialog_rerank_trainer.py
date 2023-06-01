@@ -8,7 +8,7 @@ import torch
 import torch.cuda
 import torch.nn.functional as F
 from transformers import AdamW, get_linear_schedule_with_warmup
-from itertools import chain
+import itertools
 from modelscope.metainfo import Trainers
 from modelscope.models import Model
 from modelscope.preprocessors import DocumentGroundedDialogRerankPreprocessor
@@ -65,7 +65,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         self.device = self.preprocessor.device
         self.model.to(self.device)
 
-        for jobj in self.train_dataset + sum(self.dev_dataset.values(), []):
+        for jobj in self.train_dataset + self.dev_dataset:
             self.inst_id2pos_pids[jobj['id']] = eval(jobj['positive_pids'])
             assert isinstance(eval(jobj['positive_pids']), list)
         logger.info(
@@ -74,7 +74,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
 
         # remove out-of-recall
         instance_count = 0
-        for jobj in self.train_dataset + sum(self.dev_dataset.values(), []):
+        for jobj in self.train_dataset + self.dev_dataset:
             inst_id = jobj['id']
             if inst_id not in self.inst_id2pos_pids:
                 continue
@@ -214,9 +214,9 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
                 
                 # evaluate model
             meters = self.evaluate()
-            # total_score = sum([x for x in meters.values()])
-            # logger.info(
-            #     f'obtain max score: {total_score:.4f}')
+            total_score = np.sum(np.concatenate(list(meters.values())))
+            logger.info(
+                f'obtain max score: {total_score:.4f}')
 
         get_length = self.args['max_seq_length']
         logger.info(f'loss_history = {self.loss_history.loss_history}')
@@ -226,21 +226,17 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         save_transformer(self.args, self.optimizer.model, self.tokenizer)
 
 
-    def evaluate(self, top_k:int=20, eval_lang:list= [["fr", "vi"],["fr"], ["vi"]]):
+    def evaluate(self, top_k:int=20, eval_lang:list= [["fr", "vi"], ["fr"], ["vi"]]):
         rand = random.Random()
 
         self.optimizer.model.eval()
 
-        all_meters = []
+        all_meters ={}
         for lang in eval_lang:
-            if self.dev_dataset["lang"] not in lang:
-                print(f"{lang=}")
-                continue
-
-            dataset = block_shuffle(self.dev_dataset, block_size=100000, rand=rand)
             results = {'outputs': [], 'targets': []}
+            dataset = block_shuffle(self.dev_dataset, block_size=100000, rand=rand)
             for line_ndx, jobj in enumerate(dataset):
-                if jobj['lang'] not in lang:
+                if jobj['lang'] not in lang:         
                     continue
                 
                 inst_id = jobj['id']
@@ -277,13 +273,12 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
 
             meters = measure_result(results)
             result_path = os.path.join(self.model.model_dir,
-                                        f'evaluate_rerank_{lang}.json')
+                                        f"evaluate_rerank_{'_'.join(lang)}.json")
             with open(result_path, 'w') as f:
                 json.dump(results, f, ensure_ascii=False, indent=4)
             logger.info(f"{'_'.join(lang)} - {meters}")
-            meters_lang = {}
-            meters_lang["_".join(lang)] = meters
-            all_meters.append(meters_lang)
+
+            all_meters["_".join(lang)] = meters
 
         return all_meters
 

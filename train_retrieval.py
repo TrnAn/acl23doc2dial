@@ -62,7 +62,6 @@ def main():
     train_dataset   = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn]) 
     dev_dataset     = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
-    print(f"{dev_dataset.columns}")
     # if args.extended_dataset and not bool(args.only_english):
     #     df_wo_cn    = train_dataset.head(len(train_dataset) - len(train_dataset_cn))
     #     max_len     = len(max(sum(df_wo_cn.rerank.tolist(), []), key=len))
@@ -90,7 +89,6 @@ def main():
         args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_batch_size)
 
     print(f"BATCH SIZE: {args.per_gpu_batch_size}")
-    print(f"{train_dataset.columns}")
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=args.cache_dir)
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
