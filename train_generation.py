@@ -138,12 +138,15 @@ def measure_result(result_dict):
     hypothesis_list = [
         x.replace('<extra_id_0>', '') for x in result_dict['outputs']
     ]
-    hypothesis_list = [x if len(x) > 10 else 'placeholder' for x in hypothesis_list]
+
+    pattern = r"^<response>\s*"
+    hypothesis_list = [re.sub(pattern, '', x) if len(x) > 10 else 'placeholder' for x in hypothesis_list]
     reference_list = [
-        x.replace('<response>', '') for x in result_dict['targets']
-    ]
+        re.sub(pattern, '', x) for x in result_dict['targets']
+    ] # .replace('<response>', '') 
     instance_num = len(reference_list)
 
+    print(f"{list(zip(hypothesis_list, reference_list))=}")
     # F1
     f1, em = matching_evaluate(reference_list, hypothesis_list)
     meters['f1'] = f1
@@ -169,7 +172,7 @@ def measure_result(result_dict):
 
 
 def train(trainer,
-          total_epoches=1, #10,
+          total_epoches=10,
           batch_size=16,
           accumulation_steps=1,
           learning_rate=1e-4,
@@ -206,17 +209,13 @@ def train(trainer,
                     tokenizer([x], add_special_tokens=False, return_tensors='pt')['input_ids'][0][:128])
                 for x in query
             ]
-            # print(f"query - number of tokens: {len(query)}")
+            print(f"{label=}")
 
             generator_inputs = [
                 ' '.join([query[i], '<passage>', context[i][0]])
                 for i in range(len(query))
             ]
-        
-            # for i in range(len(query)):
-            #     print(f"context= {context[i]}")
-            #     print(f"context at i= {context[i][0]}")
-            #     print(f"context length: {len(context[i][0])}") 
+            print(f"{generator_inputs[:4]=}")
 
             input_ids = tokenizer.batch_encode_plus(
                 list(generator_inputs), padding=True, return_tensors='pt').input_ids.to(device)
@@ -274,8 +273,7 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
     valid_loader = DataLoader(
         dataset=trainer.eval_dataset,
         batch_size=batch_size,
-        collate_fn=collate, 
-        pin_memory=True)
+        collate_fn=collate)
     trainer.model.model.eval()
     with torch.no_grad():
         results = {'outputs': [], 'targets': []}
@@ -302,9 +300,10 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
                 skip_special_tokens=True,
                 clean_up_tokenization_spaces=False)
 
-            print(f"{predictions=}; {label=}")
             results['outputs'] += predictions
             results['targets'] += label
+            print(f"{predictions=}; {label=}")
+
         meters = measure_result(results)
         result_path = os.path.join(trainer.model.model_dir,
                                    'evaluate_result.json')

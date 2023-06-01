@@ -55,7 +55,7 @@ def main():
             f.write(json.dumps({
                 'query': query['query'],
                 'gold_response': query['response'],
-                'response': prediction.replace('<response>','').strip(),
+                'response': prediction, #.replace('<response>','').strip()
                 'lang': query['lang']
             }, ensure_ascii=False) + '\n')
 

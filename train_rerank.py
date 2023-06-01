@@ -9,6 +9,21 @@ import argparse
 import json
 import pandas as pd
 import os
+import random
+
+import utils.preprocessing as preprocessing
+
+def split_dataset(dataset:list, seed:int=42, split_ratio:float=.9):
+    random.seed(seed)
+    random.shuffle(dataset)
+
+    # Calculate the split points
+    train_size = int(split_ratio * len(dataset))
+
+    # Split the data into training and testing sets
+    train_ds = dataset[:train_size]
+    dev_ds = dataset[train_size:]
+    return train_ds, dev_ds
 
 
 def main():
@@ -31,7 +46,7 @@ def main():
         'full_train_batch_size': 32,
         'gradient_accumulation_steps': 32,
         'per_gpu_train_batch_size': 1,
-        'num_train_epochs': 10,
+        'num_train_epochs': 1,
         'train_instances': -1,
         'learning_rate': 2e-5,
         'max_seq_length': 512,
@@ -64,34 +79,58 @@ def main():
     args[
         'gradient_accumulation_steps'] = args['full_train_batch_size'] // (
             args['per_gpu_train_batch_size'] * args['world_size'])
-    train_dataset = MsDataset.load(
-        'DAMO_ConvAI/FrDoc2BotRerank',
-        download_mode=DownloadMode.FORCE_REDOWNLOAD,
-        split='train')
     
-    print(train_dataset)
+    train_dataset_fr = preprocessing.read('DAMO_ConvAI/FrDoc2BotRerank')
+    train_dataset_vi = preprocessing.read('DAMO_ConvAI/ViDoc2BotRerank')
+
+    train_dataset_fr["lang"] = "fr"
+    train_dataset_vi["lang"] = "vi"
+    # train_dataset_fr = MsDataset.load(
+    #     'DAMO_ConvAI/FrDoc2BotRerank',
+    #     download_mode=DownloadMode.FORCE_REDOWNLOAD,
+    #     split='train')
     
-    parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"
-    all_passages = []
-    languages = ['fr', 'vi']
 
-    if args.extended_dataset:
-        if not bool(args.only_chinese):
-            languages += ['en']
-        if not bool(args.only_english):
-            languages += ['cn']
+    train_dataset_fr, dev_dataset_fr = preprocessing.test_split(train_dataset_fr)
+    train_dataset_vi, dev_dataset_vi = preprocessing.test_split(train_dataset_vi)
+    # train_dataset_vi = MsDataset.load(
+    #     'DAMO_ConvAI/ViDoc2BotRerank',
+    #     download_mode=DownloadMode.FORCE_REDOWNLOAD,
+    #     split='train')
 
-    for file_name in languages:
-        with open(f'{parent_dir}/{file_name}.json') as f:
-            all_passages += json.load(f)
+    # train_dataset_fr, dev_dataset_fr = split_dataset(list(train_dataset_fr))
+    # train_dataset_vi, dev_dataset_vi = split_dataset(list(train_dataset_vi))
 
-    eval_dataset = pd.read_json(args.eval_input_file, lines=True).to_dict('records')
-    # cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_ranking_pretrain', cache_dir=args["cache_dir"])
+    print(f"split size: {len(train_dataset_vi)=} - {len(dev_dataset_vi)=}; {len(train_dataset_fr)=} - {len(dev_dataset_fr)=}")
+  
+    # parent_dir = "all_passages/lang_token" if args["lang_token"] else "all_passages"
+    # all_passages = []
+    # languages = ['fr', 'vi']
+
+    # if args["extended_dataset"]:
+    #     if not bool(args["only_chinese"]):
+    #         languages += ['en']
+    #     if not bool(args["only_english"]):
+    #         languages += ['cn']
+
+    # for file_name in languages:
+    #     with open(f'{parent_dir}/{file_name}.json') as f:
+    #         all_passages += json.load(f)
+    train_dataset = train_dataset_fr + train_dataset_vi
+    dev_dataset   = dev_dataset_fr + dev_dataset_vi
+
     trainer = DocumentGroundedDialogRerankTrainer(
-        model=f'DAMO_ConvAI/nlp_convai_ranking_pretrain', dataset=train_dataset, args=args)
-    trainer.train()
-
-    cache_path = f'{args.cache_dir}/DAMO_ConvAI/nlp_convai_retrieval_pretrain'
+        model=f'DAMO_ConvAI/nlp_convai_ranking_pretrain', 
+        train_dataset=train_dataset.to_dict('records'), 
+        dev_dataset=dev_dataset.to_dict('records'), 
+        args=args
+        )
     
+    # trainer.train()
+
+    print(f"=== Evaluation Scores ===")
+    trainer.evaluate()
+
+
 if __name__ == '__main__':
     main()

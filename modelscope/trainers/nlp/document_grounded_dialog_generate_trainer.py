@@ -134,6 +134,8 @@ def measure_result(result_dict):
     ]
     instance_num = len(reference_list)
 
+    print(f"{hypothesis_list=}")
+    print(f"{reference_list=}")
     # F1
     f1, em = matching_evaluate(reference_list, hypothesis_list)
     meters['f1'] = f1
@@ -169,7 +171,7 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
             model_dir=self.model.model_dir, lang_token=kwargs["lang_token"])
         self.device = self.preprocessor.device
 
-        if kwargs["lang_token"]:
+        if kwargs["lang_token"] is not None:
             self.model.model.rerank.encoder.resize_token_embeddings(self.preprocessor.token_length)
 
         self.model.model.to(self.device)
@@ -215,6 +217,9 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
                         'label': label
                     },
                     invoke_mode=ModeKeys.TRAIN)
+                
+                print(f"{query=}, {context=}, {label=}")
+                print(f"{processed=}")
                 with autocast():
                     outputs = self.model.forward(processed)
                     loss = outputs.loss.mean()
@@ -275,6 +280,7 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
                         'context': context,
                     },
                     invoke_mode=ModeKeys.INFERENCE)
+                print(f"{query=}, {context=}")
                 outputs = self.model.generate(processed)
                 predictions = self.preprocessor.generation_tokenizer.batch_decode(
                     outputs,
@@ -286,6 +292,7 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
                     skip_special_tokens=True,
                     clean_up_tokenization_spaces=False)
 
+                print(f"{predictions=}; target: {label=}")
                 results['outputs'] += predictions
                 results['targets'] += label
             meters = measure_result(results)

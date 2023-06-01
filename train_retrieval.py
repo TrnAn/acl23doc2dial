@@ -15,7 +15,7 @@ def main():
     parser.add_argument("--only-english", help= "Run experiments only on English dataset", type= int, default=0)
     parser.add_argument("--only-chinese", help= "Run experiments only on Chinese dataset", type= int, default=0)
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
-    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--batch-accumulation", help= "Use batch accumulation to maintain baseline results", action=argparse.BooleanOptionalAction)
     parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
@@ -62,12 +62,13 @@ def main():
     train_dataset   = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn]) 
     dev_dataset     = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
+    print(f"{dev_dataset.columns}")
     # if args.extended_dataset and not bool(args.only_english):
     #     df_wo_cn    = train_dataset.head(len(train_dataset) - len(train_dataset_cn))
     #     max_len     = len(max(sum(df_wo_cn.rerank.tolist(), []), key=len))
     #     train_dataset["rerank"]  = train_dataset.rerank.apply(lambda s: [x[:max_len] for x in s])
     #     dev_dataset["rerank"]    = dev_dataset.rerank.apply(lambda s: [x[:max_len] for x in s])
-    print(f"{args.eval_input_file=} {args.cache_dir=}")
+
     preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname=args.eval_input_file, dir=args.cache_dir)
 
     parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"
@@ -89,7 +90,7 @@ def main():
         args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_batch_size)
 
     print(f"BATCH SIZE: {args.per_gpu_batch_size}")
-
+    print(f"{train_dataset.columns}")
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=args.cache_dir)
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
@@ -97,12 +98,12 @@ def main():
         eval_dataset=dev_dataset.to_dict('records'),
         all_passages=all_passages,
         lang_token  =args.lang_token)
-    trainer.train(
-        batch_size=128,
-        total_epoches=50,
-        per_gpu_batch_size=args.per_gpu_batch_size,
-        accumulation_steps=args.gradient_accumulation_steps
-    )
+    # trainer.train(
+    #     batch_size=128,
+    #     total_epoches=1, #50,
+    #     per_gpu_batch_size=args.per_gpu_batch_size,
+    #     accumulation_steps=args.gradient_accumulation_steps
+    # )
     trainer.evaluate(
         checkpoint_path=os.path.join(trainer.model.model_dir,
                                     'finetuned_model.bin'))

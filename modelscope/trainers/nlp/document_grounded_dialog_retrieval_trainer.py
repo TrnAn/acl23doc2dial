@@ -1,6 +1,6 @@
 # Copyright (c) Alibaba, Inc. and its affiliates.
 import os
-
+import sys
 import faiss
 import json
 import numpy as np
@@ -25,7 +25,8 @@ def collate(batch):
     query = [item['query'] for item in batch]
     positive = [item['positive'] for item in batch]
     negative = [item['negative'] for item in batch]
-    return query, positive, negative
+    lang = [item['lang'] for item in batch]
+    return query, positive, negative, lang
 
 
 def prepare_optimizer(model, lr, weight_decay, eps):
@@ -63,7 +64,7 @@ def prepare_scheduler(optimizer, epochs, steps_per_epoch, warmup_rate):
 def measure_result(result_dict):
     recall_k = [1, 5, 10, 20]
     meters = {f'R@{k}': [] for k in recall_k}
-
+    
     for output, target in zip(result_dict['outputs'], result_dict['targets']):
         for k in recall_k:
             if target in output[:k]:
@@ -85,13 +86,14 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             model_dir=self.model.model_dir, lang_token=kwargs["lang_token"])
         self.device = self.preprocessor.device
 
-        if kwargs["lang_token"]:
+        if kwargs["lang_token"] is not None:
             self.model.model.qry_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize query encoder of DPR model
             self.model.model.ctx_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize context encoder of DPR model
 
         self.model.model.to(self.device)
         self.train_dataset = kwargs['train_dataset']
         self.eval_dataset = kwargs['eval_dataset']
+
         self.all_passages = kwargs['all_passages']
 
     def train(self,
@@ -125,7 +127,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             self.model.model.train()
             losses = []
             for index, payload in enumerate(tqdm.tqdm(train_loader)):
-                query, positive, negative = payload
+                query, positive, negative, lang = payload
                 processed = self.preprocessor(
                     {
                         'query': query,
@@ -133,6 +135,8 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                         'negative': negative
                     },
                     invoke_mode=ModeKeys.TRAIN)
+                
+
                 loss, logits = self.model.forward(processed)
 
                 if accumulation_steps > 1:
@@ -156,7 +160,8 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 )
 
             meters = self.evaluate(per_gpu_batch_size=per_gpu_batch_size)
-            total_score = sum([x for x in meters.values()])
+            # total_score = sum([x for x in meters.values()])
+            total_score = sum(np.concatenate(list(meters.values()))) # score on all eval lang combinations
             if total_score >= best_score:
                 best_score = total_score
                 model_path = os.path.join(self.model.model_dir,
@@ -167,7 +172,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     'epoch %d obtain max score: %.4f, saving model to %s' %
                     (epoch, total_score, model_path))
 
-    def evaluate(self, per_gpu_batch_size=32, checkpoint_path=None):
+    def evaluate(self, per_gpu_batch_size=32, checkpoint_path=None, eval_lang=[["fr", "vi"], ["fr"], ["vi"]]):
         """
         Evaluate testsets
         """
@@ -197,25 +202,31 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             all_ctx_vector = np.concatenate(all_ctx_vector, axis=0)
             all_ctx_vector = np.array(all_ctx_vector).astype('float32')
             faiss_index = faiss.IndexFlatIP(all_ctx_vector.shape[-1])
-            faiss_index.add(all_ctx_vector)
+            faiss_index.add(all_ctx_vector) # context -> passages
 
             results = {'outputs': [], 'targets': []}
-            for index, payload in enumerate(tqdm.tqdm(valid_loader)):
-                query, positive, negative = payload
-                processed = self.preprocessor({'query': query},
-                                              invoke_mode=ModeKeys.INFERENCE)
-                query_vector = self.model.encode_query(
-                    processed).detach().cpu().numpy().astype('float32')
-                D, Index = faiss_index.search(query_vector, 20)
-                results['outputs'] += [[
-                    self.all_passages[x] for x in retrieved_ids
-                ] for retrieved_ids in Index.tolist()]
-                results['targets'] += positive
-            meters = measure_result(results)
-            result_path = os.path.join(self.model.model_dir,
-                                       'evaluate_result.json')
-            with open(result_path, 'w') as f:
-                json.dump(results, f, ensure_ascii=False, indent=4)
+            all_meters = {}
+            for lang in eval_lang:
+                for _, payload in enumerate(tqdm.tqdm(valid_loader)):
+                    query, positive, negative, curr_lang = payload
+                    if curr_lang not in lang:
+                        continue
+                    processed = self.preprocessor({'query': query},
+                                                invoke_mode=ModeKeys.INFERENCE)
+                    query_vector = self.model.encode_query(
+                        processed).detach().cpu().numpy().astype('float32')
+                    D, Index = faiss_index.search(query_vector, 20)
+                    results['outputs'] += [[
+                        self.all_passages[x] for x in retrieved_ids
+                    ] for retrieved_ids in Index.tolist()]
+                    results['targets'] += positive
+            
+                meters = measure_result(results)
+                result_path = os.path.join(self.model.model_dir,
+                                        'evaluate_result.json')
+                with open(result_path, 'w') as f:
+                    json.dump(results, f, ensure_ascii=False, indent=4)
+            all_meters["_".join(eval_lang)] = meters
+            logger.info(f"{lang=} {meters}")
 
-        logger.info(meters)
-        return meters
+        return all_meters
