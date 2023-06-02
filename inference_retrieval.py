@@ -29,13 +29,16 @@ def main():
 
     parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"
     all_passages = []
-    languages = ['fr', 'vi']
+
+    languages= []
+    if not bool(args.only_english):
+        languages += ['fr', 'vi']
 
     if args.extended_dataset:
         if not bool(args.only_chinese):
             languages += ['en']
-        if not bool(args.only_english):
-            languages += ['cn']
+        # if not bool(args.only_english):
+        #     languages += ['cn']
 
     for file_name in languages:
         with open(f'{parent_dir}/{file_name}.json') as f:
@@ -47,7 +50,8 @@ def main():
         train_dataset=None,
         eval_dataset=eval_dataset,
         all_passages=all_passages,
-        lang_token=args.lang_token
+        lang_token=args.lang_token,
+        eval_lang = [["en"]] if bool(args.only_english) else [["fr", "vi"], ["fr"], ["vi"]]
     )
 
     trainer.evaluate(

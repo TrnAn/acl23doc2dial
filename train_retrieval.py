@@ -58,9 +58,12 @@ def main():
         dev_dataset_en = preprocessing.add_lang_token(dev_dataset_en, "en", colnames=["query", "positive", "negative"])  
         dev_dataset_cn = preprocessing.add_lang_token(dev_dataset_cn, "cn", colnames=["query", "positive", "negative"])   
 
-
-    train_dataset   = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn]) 
-    dev_dataset     = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
+    if bool(args.only_english):
+        train_dataset   = train_dataset_en
+        dev_dataset     = dev_dataset_en
+    else:
+        train_dataset   = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn]) 
+        dev_dataset     = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
     # if args.extended_dataset and not bool(args.only_english):
     #     df_wo_cn    = train_dataset.head(len(train_dataset) - len(train_dataset_cn))
@@ -72,7 +75,9 @@ def main():
 
     parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"
     all_passages = []
-    languages = ['fr', 'vi']
+    languages = []
+    if not bool(args.only_english): 
+        languages += ['fr', 'vi']
 
     if args.extended_dataset:
         if not bool(args.only_chinese):
@@ -95,13 +100,15 @@ def main():
         train_dataset=train_dataset.to_dict('records'),
         eval_dataset=dev_dataset.to_dict('records'),
         all_passages=all_passages,
-        lang_token  =args.lang_token)
-    # trainer.train(
-    #     batch_size=128,
-    #     total_epoches=1, #50,
-    #     per_gpu_batch_size=args.per_gpu_batch_size,
-    #     accumulation_steps=args.gradient_accumulation_steps
-    # )
+        lang_token  =args.lang_token,
+        eval_lang = [["en"]] if bool(args.only_english) else [["fr", "vi"], ["fr"], ["vi"]]
+    )
+    trainer.train(
+        batch_size=128,
+        total_epoches=10,
+        per_gpu_batch_size=args.per_gpu_batch_size,
+        accumulation_steps=args.gradient_accumulation_steps
+    )
     trainer.evaluate(
         checkpoint_path=os.path.join(trainer.model.model_dir,
                                     'finetuned_model.bin'))

@@ -85,7 +85,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
         self.preprocessor = DocumentGroundedDialogRetrievalPreprocessor(
             model_dir=self.model.model_dir, lang_token=kwargs["lang_token"])
         self.device = self.preprocessor.device
-
+        self.eval_lang = kwargs["eval_lang"]
         if kwargs["lang_token"] is not None:
             self.model.model.qry_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize query encoder of DPR model
             self.model.model.ctx_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize context encoder of DPR model
@@ -160,8 +160,12 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 )
 
             meters = self.evaluate(per_gpu_batch_size=per_gpu_batch_size)
+         
             # total_score = sum([x for x in meters.values()])
-            total_score = np.sum(np.concatenate(list(meters.values()))) # score on all eval lang combinations
+            total_score = sum(sum(meter.values()) for meter in meters.values()) # score on all eval lang combinations
+            logger.info(
+                f'obtain max score: {total_score:.4f}')
+            
             if total_score >= best_score:
                 best_score = total_score
                 model_path = os.path.join(self.model.model_dir,
@@ -172,10 +176,13 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     'epoch %d obtain max score: %.4f, saving model to %s' %
                     (epoch, total_score, model_path))
 
-    def evaluate(self, per_gpu_batch_size=32, checkpoint_path=None, eval_lang=[["fr", "vi"], ["fr"], ["vi"]]):
+    def evaluate(self, per_gpu_batch_size=32, checkpoint_path=None):
         """
         Evaluate testsets
         """
+        # if self.only_english:
+        #     eval_lang = [["en"]]
+
         if checkpoint_path is not None:
             state_dict = torch.load(checkpoint_path)
             self.model.model.load_state_dict(state_dict)
@@ -199,15 +206,14 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             all_ctx_vector = np.array(all_ctx_vector).astype('float32')
             faiss_index = faiss.IndexFlatIP(all_ctx_vector.shape[-1])
             faiss_index.add(all_ctx_vector) # context -> passages
-
             
-            valid_loader = DataLoader(
-                    dataset=self.eval_dataset,
-                    batch_size=per_gpu_batch_size,
-                    collate_fn=collate)
+            # valid_loader = DataLoader(
+            #         dataset=self.eval_dataset,
+            #         batch_size=per_gpu_batch_size,
+            #         collate_fn=collate)
   
             all_meters = {}
-            for lang in eval_lang:
+            for lang in self.eval_lang:
                 print(f"{lang=}")
                 results = {'outputs': [], 'targets': []}
                 valid_loader = DataLoader(
@@ -244,5 +250,5 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     json.dump(results, f, ensure_ascii=False, indent=4)
 
                 all_meters["_".join(lang)] = meters
-
+                print(f"{all_meters=}")
         return all_meters

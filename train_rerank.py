@@ -45,8 +45,8 @@ def main():
         'max_num_seq_pairs_per_device': 32,
         'full_train_batch_size': 32,
         'gradient_accumulation_steps': 32,
-        'per_gpu_train_batch_size': 1,
-        'num_train_epochs': 1,
+        'per_gpu_train_batch_size': 16,
+        'num_train_epochs': 10,
         'train_instances': -1,
         'learning_rate': 2e-5,
         'max_seq_length': 512,
@@ -116,6 +116,7 @@ def main():
     # for file_name in languages:
     #     with open(f'{parent_dir}/{file_name}.json') as f:
     #         all_passages += json.load(f)
+    
     train_dataset = pd.concat([train_dataset_fr, train_dataset_vi]) 
     dev_dataset   = pd.concat([dev_dataset_fr, dev_dataset_vi]) 
 
@@ -126,7 +127,7 @@ def main():
         args=args
         )
     
-    # trainer.train()
+    trainer.train()
 
     print(f"=== Evaluation Scores ===")
     trainer.evaluate()

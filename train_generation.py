@@ -40,7 +40,8 @@ def collate(batch):
     query = [item['query'] for item in batch]
     context = [item['rerank'] for item in batch]
     label = [item['response'] for item in batch]
-    return query, context, label
+    lang = [item['lang'] for item in batch]
+    return query, context, label, lang
 
 
 def prepare_optimizer(model, lr, weight_decay, eps):
@@ -146,7 +147,6 @@ def measure_result(result_dict):
     ] # .replace('<response>', '') 
     instance_num = len(reference_list)
 
-    print(f"{list(zip(hypothesis_list, reference_list))=}")
     # F1
     f1, em = matching_evaluate(reference_list, hypothesis_list)
     meters['f1'] = f1
@@ -172,6 +172,7 @@ def measure_result(result_dict):
 
 
 def train(trainer,
+          eval_lang:list,
           total_epoches=10,
           batch_size=16,
           accumulation_steps=1,
@@ -203,19 +204,18 @@ def train(trainer,
         trainer.model.model.train()
         losses = []
         for index, payload in enumerate(tqdm.tqdm(train_loader)):
-            query, context, label = payload
+            query, context, label,_ = payload
+ 
             query = [
                 tokenizer.decode(
                     tokenizer([x], add_special_tokens=False, return_tensors='pt')['input_ids'][0][:128])
                 for x in query
             ]
-            print(f"{label=}")
 
             generator_inputs = [
                 ' '.join([query[i], '<passage>', context[i][0]])
                 for i in range(len(query))
             ]
-            print(f"{generator_inputs[:4]=}")
 
             input_ids = tokenizer.batch_encode_plus(
                 list(generator_inputs), padding=True, return_tensors='pt').input_ids.to(device)
@@ -248,8 +248,9 @@ def train(trainer,
                 f'epoch: {epoch} \t batch: last \t loss: {sum(losses) / len(losses)}'
             )
 
-        meters = evaluate(trainer, batch_size=batch_size)
-        total_score = sum([x for x in meters.values()])
+        meters = evaluate(trainer, eval_lang=eval_lang,  batch_size=batch_size)
+        # total_score = sum([x for x in meters.values()])
+        total_score = sum(sum(meter.values()) for meter in meters.values())
         if total_score >= best_score:
             best_score = total_score
             model_path = os.path.join(trainer.model.model_dir,
@@ -261,7 +262,7 @@ def train(trainer,
                 (epoch, total_score, model_path))
 
 
-def evaluate(trainer, batch_size=16, checkpoint_path=None):
+def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
     model = trainer.model.model.generator.generator
     tokenizer = trainer.preprocessor.generation_tokenizer
     device = trainer.preprocessor.device
@@ -270,47 +271,58 @@ def evaluate(trainer, batch_size=16, checkpoint_path=None):
         state_dict = torch.load(checkpoint_path)
         trainer.model.model.load_state_dict(state_dict)
 
-    valid_loader = DataLoader(
-        dataset=trainer.eval_dataset,
-        batch_size=batch_size,
-        collate_fn=collate)
     trainer.model.model.eval()
-    with torch.no_grad():
-        results = {'outputs': [], 'targets': []}
-        for index, payload in enumerate(tqdm.tqdm(valid_loader)):
-            query, context, label = payload
-            query = [
-                tokenizer.decode(
-                    tokenizer([x], add_special_tokens=False, return_tensors='pt')['input_ids'][0][:128])
-                for x in query
-            ]
-            generator_inputs = [
-                ' '.join([query[i], '<passage>', context[i][0]])
-                for i in range(len(query))
-            ]
-            input_ids = tokenizer.batch_encode_plus(
-                list(generator_inputs), padding=True, return_tensors='pt').input_ids.to(device)
+    all_meters= {}
+    for lang in eval_lang:
+        with torch.no_grad():
+            valid_loader = DataLoader(
+                dataset=trainer.eval_dataset,
+                batch_size=batch_size,
+                collate_fn=collate)
+            results = {'outputs': [], 'targets': []}
+            for index, payload in enumerate(tqdm.tqdm(valid_loader)):
+                query, context, label, curr_lang = payload
+                if bool(set(curr_lang) & set(lang)) == 0:
+                    continue
+                query, context, label, curr_lang = zip(*[(q, p, n, l) for q, p, n, l in zip(query, context, label, curr_lang) if l in lang])
+                query = list(query)
+                context = list(context)
+                label =list(label)
+                curr_lang = list(curr_lang)
 
-            outputs = model.generate(input_ids, num_beams=3, max_length=128, early_stopping=True,
-                                     no_repeat_ngram_size=3)
-            predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False)
-            label = trainer.preprocessor.generation_tokenizer.batch_decode(
-                trainer.preprocessor.generation_tokenizer.batch_encode_plus(
-                    label, add_special_tokens=False).input_ids,
-                skip_special_tokens=True,
-                clean_up_tokenization_spaces=False)
+                query = [
+                    tokenizer.decode(
+                        tokenizer([x], add_special_tokens=False, return_tensors='pt')['input_ids'][0][:128])
+                    for x in query
+                ]
+                generator_inputs = [
+                    ' '.join([query[i], '<passage>', context[i][0]])
+                    for i in range(len(query))
+                ]
+                input_ids = tokenizer.batch_encode_plus(
+                    list(generator_inputs), padding=True, return_tensors='pt').input_ids.to(device)
 
-            results['outputs'] += predictions
-            results['targets'] += label
-            print(f"{predictions=}; {label=}")
+                outputs = model.generate(input_ids, num_beams=3, max_length=128, early_stopping=True,
+                                        no_repeat_ngram_size=3)
+                predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False)
+                label = trainer.preprocessor.generation_tokenizer.batch_decode(
+                    trainer.preprocessor.generation_tokenizer.batch_encode_plus(
+                        label, add_special_tokens=False).input_ids,
+                    skip_special_tokens=True,
+                    clean_up_tokenization_spaces=False)
 
-        meters = measure_result(results)
-        result_path = os.path.join(trainer.model.model_dir,
-                                   'evaluate_result.json')
-        with open(result_path, 'w') as f:
-            json.dump(results, f, ensure_ascii=False, indent=4)
-    logger.info(meters)
-    return meters
+                results['outputs'] += predictions
+                results['targets'] += label
+
+            meters = measure_result(results)
+            result_path = os.path.join(trainer.model.model_dir,
+                                    f"{'_'.join(lang)}_evaluate_result.json")
+            logger.info(f"{'_'.join(lang)} - {meters}")
+            with open(result_path, 'w') as f:
+                json.dump(results, f, ensure_ascii=False, indent=4)
+            all_meters["_".join(lang)] = meters
+            print(f"{all_meters=}")
+    return all_meters
 
 
 def main():
@@ -376,12 +388,16 @@ def main():
         dev_dataset_en = preprocessing.add_lang_token(dev_dataset_en, "en", ["query", "rerank"]) 
         dev_dataset_cn = preprocessing.add_lang_token(dev_dataset_cn, "cn", ["query", "rerank"]) 
 
-    train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn])
-    dev_df      = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
+    if args.only_english:
+        train_df = train_dataset_en
+        dev_df  = dev_dataset_en
+    else:
+        train_df    = pd.concat([train_dataset_fr, train_dataset_vn, train_dataset_en, train_dataset_cn])
+        dev_df      = pd.concat([dev_dataset_fr, dev_dataset_vn, dev_dataset_en, dev_dataset_cn])
 
-    # if not args.lang_token:
-    #     train_df["rerank"]  = train_df.rerank.apply(literal_eval)
-    #     dev_df["rerank"]    = dev_df.rerank.apply(literal_eval)
+    if not args.lang_token:
+        train_df["rerank"]  = train_df.rerank.apply(literal_eval)
+        dev_df["rerank"]    = dev_df.rerank.apply(literal_eval)
 
     # truncate passages
     if args.extended_dataset and not bool(args.only_english):
@@ -418,8 +434,9 @@ def main():
         args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_batch_size)
 
     print(f"BATCH SIZE: {args.per_gpu_batch_size}")
-    train(trainer, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
-    evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
+    eval_lang = [["en"]] if args.only_english else [["fr", "vi"], ["fr"], ["vi"]]
+    train(trainer, eval_lang=eval_lang, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
+    evaluate(trainer, eval_lang=eval_lang, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 
 

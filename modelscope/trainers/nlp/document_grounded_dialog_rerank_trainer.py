@@ -214,7 +214,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
                 
                 # evaluate model
             meters = self.evaluate()
-            total_score = np.sum(np.concatenate(list(meters.values())))
+            total_score = sum(sum(meter.values()) for meter in meters.values())
             logger.info(
                 f'obtain max score: {total_score:.4f}')
 

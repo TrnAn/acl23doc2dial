@@ -134,8 +134,6 @@ def measure_result(result_dict):
     ]
     instance_num = len(reference_list)
 
-    print(f"{hypothesis_list=}")
-    print(f"{reference_list=}")
     # F1
     f1, em = matching_evaluate(reference_list, hypothesis_list)
     meters['f1'] = f1
@@ -218,8 +216,6 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
                     },
                     invoke_mode=ModeKeys.TRAIN)
                 
-                print(f"{query=}, {context=}, {label=}")
-                print(f"{processed=}")
                 with autocast():
                     outputs = self.model.forward(processed)
                     loss = outputs.loss.mean()
@@ -280,7 +276,6 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
                         'context': context,
                     },
                     invoke_mode=ModeKeys.INFERENCE)
-                print(f"{query=}, {context=}")
                 outputs = self.model.generate(processed)
                 predictions = self.preprocessor.generation_tokenizer.batch_decode(
                     outputs,
@@ -292,7 +287,6 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
                     skip_special_tokens=True,
                     clean_up_tokenization_spaces=False)
 
-                print(f"{predictions=}; target: {label=}")
                 results['outputs'] += predictions
                 results['targets'] += label
             meters = measure_result(results)

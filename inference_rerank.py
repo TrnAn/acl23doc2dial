@@ -101,12 +101,16 @@ def main():
     passage_to_id = {}
     ptr = -1
     parent_dir = "all_passages/lang_token" if args["lang_token"] else "all_passages"
-    languages = ['fr', 'vi']
+    
+    languages = []
+    if not bool(args["only_english"]):
+        languages += ['fr', 'vi']
+        
     if args["extended_dataset"]:
         if not bool(args["only_chinese"]):
             languages += ['en']
-        if not bool(args["only_english"]):
-            languages += ['cn']
+        # if not bool(args["only_english"]):
+        #     languages += ['cn']
 
     for file_name in languages:
         with open(f'./{parent_dir}/{file_name}.json') as f:
