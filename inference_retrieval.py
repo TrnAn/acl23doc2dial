@@ -4,6 +4,9 @@ from modelscope.trainers.nlp.document_grounded_dialog_retrieval_trainer import \
     DocumentGroundedDialogRetrievalTrainer
 import datetime
 import argparse
+from utils.seed import set_seed
+set_seed()
+
 
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')

@@ -6,6 +6,9 @@ from train_generation import evaluate
 import datetime
 import argparse
 import pandas as pd
+from utils.seed import set_seed
+set_seed()
+
 
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')

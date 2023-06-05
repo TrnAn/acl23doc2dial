@@ -56,7 +56,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         self.inst_id2pos_passages = dict()
         self.train_dataset = train_dataset
         self.dev_dataset = dev_dataset
-        self.model = Model.from_pretrained(model, revision='v1.0.0')
+        self.model = Model.from_pretrained(model, revision='v1.0.0', cache_dir=args["cache_dir"])
         self.preprocessor = DocumentGroundedDialogRerankPreprocessor(
             self.model.model_dir, **args)
         self.tokenizer = self.preprocessor.tokenizer
@@ -227,6 +227,9 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
 
 
     def evaluate(self, top_k:int=20, eval_lang:list= [["fr", "vi"], ["fr"], ["vi"]]):
+        logger.info(f"start evaluation...")
+
+        random.seed(42)
         rand = random.Random()
 
         self.optimizer.model.eval()
@@ -272,6 +275,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
                 results['targets'] += [id_text_dict[positive_pids[0]]]
 
             meters = measure_result(results)
+            logger.info(f"save reranked passages to: {self.model.model_dir}...")
             result_path = os.path.join(self.model.model_dir,
                                         f"evaluate_rerank_{'_'.join(lang)}.json")
             with open(result_path, 'w') as f:

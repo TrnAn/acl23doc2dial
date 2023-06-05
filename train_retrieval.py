@@ -6,6 +6,8 @@ from modelscope.trainers.nlp.document_grounded_dialog_retrieval_trainer import \
     DocumentGroundedDialogRetrievalTrainer
 import utils.preprocessing as preprocessing
 import argparse
+from utils.seed import set_seed
+set_seed()
 
 
 def main():
@@ -20,7 +22,7 @@ def main():
     parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 128)
-    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 1)
+    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 64)
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
     parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
 
@@ -91,7 +93,7 @@ def main():
 
         # use batch accumulation
     if args.batch_accumulation:
-        args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_batch_size)
+        args.gradient_accumulation_steps = args.batch_size // (args.num_devices * args.per_gpu_batch_size)
 
     print(f"BATCH SIZE: {args.per_gpu_batch_size}")
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=args.cache_dir)
@@ -105,9 +107,10 @@ def main():
     )
     trainer.train(
         batch_size=128,
-        total_epoches=10,
-        per_gpu_batch_size=args.per_gpu_batch_size,
-        accumulation_steps=args.gradient_accumulation_steps
+        total_epoches=1, #10,
+        # per_gpu_batch_size=args.per_gpu_batch_size,
+        accumulation_steps=args.gradient_accumulation_steps,
+        loss_log_freq=1
     )
     trainer.evaluate(
         checkpoint_path=os.path.join(trainer.model.model_dir,

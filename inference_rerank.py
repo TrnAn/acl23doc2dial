@@ -9,6 +9,9 @@ from modelscope.preprocessors.nlp import \
     DocumentGroundedDialogRerankPreprocessor
 from typing import Union
 import argparse
+from utils.seed import set_seed
+set_seed()
+
 
 class myDocumentGroundedDialogRerankPipeline(DocumentGroundedDialogRerankPipeline):
     def __init__(self,
@@ -64,7 +67,7 @@ def main():
     json.dump(model_configuration, file_out, indent=4)
     file_out.close()
     args.update({
-        'output': './',
+        'output': model_dir,
         'max_batch_size': 64,
         'exclude_instances': '',
         'include_passages': False,
@@ -73,7 +76,8 @@ def main():
         'query_length': 195,
         'tokenizer_resize': True,
         'model_resize': True,
-        'kilt_data': True
+        'kilt_data': True,
+        'cache_dir': args["cache_dir"]
     })
     model = Model.from_pretrained(model_dir, **args)
     mypreprocessor = DocumentGroundedDialogRerankPreprocessor(
@@ -136,6 +140,7 @@ def main():
         now_input = x
         now_wikipedia = []
         now_passages = []
+        print(f"{len(retrieval_result)=} - {ptr} - {len(all_querys)=}")
         all_candidates = retrieval_result[ptr]
         target = retrieval_targets[ptr]
         

@@ -35,6 +35,9 @@ logger = get_logger()
 import sys
 sys.path.insert(0, '/path/to/your/local/folder')
 
+from utils.seed import set_seed
+set_seed()
+
 # TODO Fix bug for cn/en dataset: missing rerank column error - breaks at 'context' list comprehension
 def collate(batch):
     query = [item['query'] for item in batch]
@@ -241,8 +244,6 @@ def train(trainer,
                 )
                 losses = []
 
-            print(f"Memory cached: {torch.cuda.memory_allocated()/1024**2}MB")
-
         if losses:
             logger.info(
                 f'epoch: {epoch} \t batch: last \t loss: {sum(losses) / len(losses)}'
@@ -435,7 +436,7 @@ def main():
 
     print(f"BATCH SIZE: {args.per_gpu_batch_size}")
     eval_lang = [["en"]] if args.only_english else [["fr", "vi"], ["fr"], ["vi"]]
-    train(trainer, eval_lang=eval_lang, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4)
+    train(trainer, eval_lang=eval_lang, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=1, learning_rate=1e-4, loss_log_freq=1)
     evaluate(trainer, eval_lang=eval_lang, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 

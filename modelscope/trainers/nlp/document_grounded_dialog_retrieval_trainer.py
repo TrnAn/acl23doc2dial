@@ -139,8 +139,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
 
                 loss, logits = self.model.forward(processed)
 
-                if accumulation_steps > 1:
-                    loss = loss / accumulation_steps
+                loss = loss / accumulation_steps
 
                 loss.backward()
 
@@ -228,7 +227,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     query, positive, negative, curr_lang = zip(*[(q, p, n, l) for q, p, n, l in zip(query, positive, negative, curr_lang) if l in lang])
                     query = list(query)
                     positive = list(positive)
-                    negative =list(negative)
+                    negative = list(negative)
                     curr_lang = list(curr_lang)
 
                     processed = self.preprocessor({'query': query},
