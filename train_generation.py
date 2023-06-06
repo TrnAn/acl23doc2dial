@@ -288,7 +288,7 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
                 query, context, label, curr_lang = zip(*[(q, p, n, l) for q, p, n, l in zip(query, context, label, curr_lang) if l in lang])
                 query = list(query)
                 context = list(context)
-                label =list(label)
+                label = list(label)
                 curr_lang = list(curr_lang)
 
                 query = [
@@ -436,7 +436,7 @@ def main():
 
     print(f"BATCH SIZE: {args.per_gpu_batch_size}")
     eval_lang = [["en"]] if args.only_english else [["fr", "vi"], ["fr"], ["vi"]]
-    train(trainer, eval_lang=eval_lang, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=1, learning_rate=1e-4, loss_log_freq=1)
+    train(trainer, eval_lang=eval_lang, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4, loss_log_freq=1)
     evaluate(trainer, eval_lang=eval_lang, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 

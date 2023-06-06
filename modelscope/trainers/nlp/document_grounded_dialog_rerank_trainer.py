@@ -56,13 +56,17 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         self.inst_id2pos_passages = dict()
         self.train_dataset = train_dataset
         self.dev_dataset = dev_dataset
+        print(f"{model=}")
         self.model = Model.from_pretrained(model, revision='v1.0.0', cache_dir=args["cache_dir"])
+
+        print(f"{self.model.model_dir=}")
         self.preprocessor = DocumentGroundedDialogRerankPreprocessor(
             self.model.model_dir, **args)
         self.tokenizer = self.preprocessor.tokenizer
         if args['model_resize']:
             self.model.resize_token_embeddings(len(self.tokenizer))
         self.device = self.preprocessor.device
+        logger.info(f"{self.device=}")
         self.model.to(self.device)
 
         for jobj in self.train_dataset + self.dev_dataset:
@@ -109,6 +113,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
             )
         self.args = args
         self.max_length_count = 0
+
 
     def one_instance(self, query, passages):
         model = self.optimizer.model
@@ -233,56 +238,62 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         rand = random.Random()
 
         self.optimizer.model.eval()
-
         all_meters ={}
-        for lang in eval_lang:
-            results = {'outputs': [], 'targets': []}
-            dataset = block_shuffle(self.dev_dataset, block_size=100000, rand=rand)
-            for line_ndx, jobj in enumerate(dataset):
-                if jobj['lang'] not in lang:         
-                    continue
-                
-                inst_id = jobj['id']
-                if inst_id not in self.inst_id2pos_pids:
-                    continue
-                if line_ndx % self.args['world_size'] != \
-                        self.args['global_rank']:
-                    continue
-                query = jobj['input'] if 'input' in jobj else jobj['query']
-                passages = eval(jobj['passages'])
-                positive_pids = self.inst_id2pos_pids[inst_id]
-                if self.args['doc_match_weight'] > 0:
-                    positive_dids = [
-                        pid[:pid.index('::')] for pid in positive_pids
+        for idx, lang in enumerate(eval_lang):
+            with torch.no_grad():
+                results = {'outputs': [], 'targets': []}
+                dataset = block_shuffle(self.dev_dataset, block_size=100000, rand=rand)
+                for line_ndx, jobj in enumerate(dataset):
+                    
+                    if jobj['lang'] not in lang:     
+                        continue
+                    
+                    inst_id = jobj['id']
+                    if inst_id not in self.inst_id2pos_pids:
+                        continue
+                    if line_ndx % self.args['world_size'] != \
+                            self.args['global_rank']:
+                        continue
+                    query = jobj['input'] if 'input' in jobj else jobj['query']
+                    passages = eval(jobj['passages'])
+                    positive_pids = self.inst_id2pos_pids[inst_id]
+                    if self.args['doc_match_weight'] > 0:
+                        positive_dids = [
+                            pid[:pid.index('::')] for pid in positive_pids
+                        ]
+                    else:
+                        positive_dids = None
+                    correctness = [
+                        self.passage_correctness(p['pid'], positive_pids,
+                                                    positive_dids) for p in passages
                     ]
-                else:
-                    positive_dids = None
-                correctness = [
-                    self.passage_correctness(p['pid'], positive_pids,
-                                                positive_dids) for p in passages
-                ]
-                passages, correctness = self.limit_gpu_sequences(
-                    passages, correctness, rand)
-                logits = self.one_instance(query, passages)    
-                score_passage_pairs = zip(logits, passages)
-                # curr_lang = re.match(r"<.*?>")
-                # score_passage_pairs = [ l, p in zip(logits, passages) if p.startswith(curr_lang)] # contraint on: same lang
-                sorted_pairs = sorted(score_passage_pairs, key=lambda x: x[0], reverse=True)
-                top_k_passages = [pair[1]['text'] for pair in sorted_pairs[:top_k]]
-                results['outputs'] += [top_k_passages]
+                    passages, correctness = self.limit_gpu_sequences(
+                        passages, correctness, rand)
 
-                id_text_dict = {d['pid']:d['text'] for d in passages}
-                results['targets'] += [id_text_dict[positive_pids[0]]]
+                    logits = self.one_instance(query, passages) 
+                    # print(f"{logits=}")   
+                    score_passage_pairs = zip(logits, passages)
+                    # curr_lang = re.match(r"<.*?>")
+                    # score_passage_pairs = [ l, p in zip(logits, passages) if p.startswith(curr_lang)] # contraint on: same lang
+                    sorted_pairs = sorted(score_passage_pairs, key=lambda x: x[0], reverse=True)
 
-            meters = measure_result(results)
-            logger.info(f"save reranked passages to: {self.model.model_dir}...")
-            result_path = os.path.join(self.model.model_dir,
-                                        f"evaluate_rerank_{'_'.join(lang)}.json")
-            with open(result_path, 'w') as f:
-                json.dump(results, f, ensure_ascii=False, indent=4)
-            logger.info(f"{'_'.join(lang)} - {meters}")
+                    # print(f"{sorted_pairs[:top_k]=}")
+                    top_k_passages = [pair[1]['text'] for pair in sorted_pairs[:top_k]]
+    
+                    results['outputs'] += [top_k_passages]
 
-            all_meters["_".join(lang)] = meters
+                    id_text_dict = {d['pid']:d['text'] for d in passages}
+                    results['targets'] += [id_text_dict[positive_pids[0]]]
+
+                meters = measure_result(results)
+                logger.info(f"save reranked passages to: {self.model.model_dir}...")
+                result_path = os.path.join(self.model.model_dir,
+                                            f"evaluate_rerank_{'_'.join(lang)}.json")
+                with open(result_path, 'w') as f:
+                    json.dump(results, f, ensure_ascii=False, indent=4)
+                logger.info(f"{'_'.join(lang)} - {meters}")
+
+                all_meters["_".join(lang)] = meters
 
         return all_meters
 

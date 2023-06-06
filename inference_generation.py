@@ -24,10 +24,10 @@ def main():
     parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"
     with open(f'{parent_dir}/id_to_passage.json') as f:
         id_to_passage = json.load(f)
-
     eval_dataset = []
     with open(f'{args.cache_dir}/rerank_output.jsonl') as f:
         for line in f.readlines():
+            # print(line)
             sample = json.loads(line)
             if sample["lang"] not in args.eval_lang:
                 continue
@@ -44,12 +44,14 @@ def main():
         model=cache_path,
         train_dataset=None,
         eval_dataset=eval_dataset,
-        lang_token=args.lang_token
+        lang_token=args.lang_token,
+        eval_lang=args.eval_lang
     )
 
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
-                                                f'finetuned_model.bin'))
-    with open(f'{cache_path}/evaluate_result.json') as f:
+                                                f'finetuned_model.bin'), eval_lang=[args.eval_lang])
+    fname= f"{'_'.join(args.eval_lang)}_evaluate_result.json"
+    with open(f'{cache_path}/{fname}') as f:
         predictions = json.load(f)['outputs']
 
     eval_langs = "_".join(args.eval_lang)    

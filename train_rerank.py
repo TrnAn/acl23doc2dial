@@ -48,7 +48,7 @@ def main():
         'full_train_batch_size': 32,
         'gradient_accumulation_steps': 32,
         'per_gpu_train_batch_size': 1,
-        'num_train_epochs': 1, # 10,
+        'num_train_epochs': 10, # 10,
         'train_instances': -1,
         'learning_rate': 2e-5,
         'max_seq_length': 512,

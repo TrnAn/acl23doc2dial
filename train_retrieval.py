@@ -107,7 +107,7 @@ def main():
     )
     trainer.train(
         batch_size=128,
-        total_epoches=1, #10,
+        total_epoches=10, #10,
         # per_gpu_batch_size=args.per_gpu_batch_size,
         accumulation_steps=args.gradient_accumulation_steps,
         loss_log_freq=1

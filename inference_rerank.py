@@ -7,6 +7,8 @@ from modelscope.models.nlp import DocumentGroundedDialogRerankModel
 from modelscope.pipelines.nlp import DocumentGroundedDialogRerankPipeline
 from modelscope.preprocessors.nlp import \
     DocumentGroundedDialogRerankPreprocessor
+from modelscope.trainers.nlp.document_grounded_dialog_rerank_trainer import \
+    DocumentGroundedDialogRerankTrainer
 from typing import Union
 import argparse
 from utils.seed import set_seed
@@ -77,11 +79,48 @@ def main():
         'tokenizer_resize': True,
         'model_resize': True,
         'kilt_data': True,
-        'cache_dir': args["cache_dir"]
+        'cache_dir': args["cache_dir"],
+        'seed': 42,
+        'tokenizer_name': '',
+        'instances_size': 1,
+        'output_dir': f'{args["cache_dir"]}/output',
+        'max_num_seq_pairs_per_device': 32,
+        'full_train_batch_size': 32,
+        'gradient_accumulation_steps': 32,
+        'per_gpu_train_batch_size': 1,
+        'num_train_epochs': 1, # 10,
+        'train_instances': -1,
+        'learning_rate': 2e-5,
+        'max_seq_length': 512,
+        'num_labels': 2,
+        'fold': '',  # IofN
+        'doc_match_weight': 0.0,
+        'query_length': 195,
+        'resume_from': '',  # to resume training from a checkpoint
+        'config_name': '',
+        'do_lower_case': True,
+        'weight_decay': 0.0,  # previous default was 0.01
+        'adam_epsilon': 1e-8,
+        'max_grad_norm': 1.0,
+        'warmup_instances': 0,  # previous default was 0.1 of total
+        'warmup_fraction': 0.0,  # only applies if warmup_instances <= 0
+        'no_cuda': False,
+        'n_gpu': 1,
+        'seed': 42,
+        'fp16': False,
+        'fp16_opt_level': 'O1',  # previous default was O2
+        'per_gpu_eval_batch_size': 8,
+        'log_on_all_nodes': False,
+        'world_size': 1,
+        'global_rank': 0,
+        'local_rank': -1,
+        'tokenizer_resize': True,
+        'model_resize': True
     })
     model = Model.from_pretrained(model_dir, **args)
     mypreprocessor = DocumentGroundedDialogRerankPreprocessor(
         model.model_dir, **args)
+
     pipeline_ins = myDocumentGroundedDialogRerankPipeline(
         model=model, preprocessor=mypreprocessor, **args)
 
@@ -140,12 +179,13 @@ def main():
         now_input = x
         now_wikipedia = []
         now_passages = []
-        print(f"{len(retrieval_result)=} - {ptr} - {len(all_querys)=}")
+ 
         all_candidates = retrieval_result[ptr]
         target = retrieval_targets[ptr]
         
-        for every_passage in all_candidates:
+        for idx, every_passage in enumerate(all_candidates):
             get_pid = passage_to_id[every_passage]
+            get_positive_pid = passage_to_id[target]
             now_wikipedia.append({'wikipedia_id': str(get_pid)})
             now_passages.append({"pid": str(get_pid), "title": "", "text": every_passage})
         now_output = [{'answer': target, 'provenance': now_wikipedia}]
@@ -155,11 +195,28 @@ def main():
         ids_list.append(now_id)
         output_list.append(str(now_output))
         lang_list.append(now_input["lang"])
-        
-        positive_pids_list.append(str([]))
+        # positive_pids_list.append(str([]))
+        positive_pids_list.append(json.dumps([get_positive_pid]))
     
+
     evaluate_dataset = {'input': input_list, 'id': ids_list, 'passages': passages_list, 'output': output_list,
                         'positive_pids': positive_pids_list, 'lang': lang_list}
+
+
+    dev_dataset = [
+        {key: value for key, value in zip(evaluate_dataset.keys(), values)}
+        for values in zip(*evaluate_dataset.values())
+    ]
+
+    args["device"] = "gpu"
+    trainer = DocumentGroundedDialogRerankTrainer(
+        model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 
+        train_dataset=[], 
+        dev_dataset=dev_dataset, 
+        args=args
+        )
+
+    trainer.evaluate(eval_lang=[args["eval_lang"]])
     pipeline_ins(evaluate_dataset)
     pipeline_ins.save(f'./{args["cache_dir"]}/rerank_output.jsonl')
 

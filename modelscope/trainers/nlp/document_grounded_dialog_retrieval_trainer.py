@@ -212,14 +212,14 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             #         collate_fn=collate)
   
             all_meters = {}
-            for lang in self.eval_lang:
+            for idx, lang in enumerate(self.eval_lang):
                 print(f"{lang=}")
                 results = {'outputs': [], 'targets': []}
                 valid_loader = DataLoader(
                     dataset=self.eval_dataset,
                     batch_size=per_gpu_batch_size,
                     collate_fn=collate)
-                for _, payload in enumerate(tqdm.tqdm(valid_loader)):
+                for payload in tqdm.tqdm(valid_loader):
                     query, positive, negative, curr_lang = payload
                     if bool(set(curr_lang) & set(lang)) == 0:
                         continue
@@ -241,12 +241,14 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     results['targets'] += positive
             
                 meters = measure_result(results)
-                result_path = os.path.join(self.model.model_dir,
-                                        'evaluate_result.json')
-                logger.info(f"{'_'.join(lang)} - {meters}")
 
-                with open(result_path, 'w') as f:
-                    json.dump(results, f, ensure_ascii=False, indent=4)
+                logger.info(f"{'_'.join(lang)} - {meters}")
+                if idx == 0:
+                    result_path = os.path.join(self.model.model_dir,
+                        f'evaluate_result.json')
+                    logger.info(f"saving evaluate_result.json...")
+                    with open(result_path, 'w') as f:
+                        json.dump(results, f, ensure_ascii=False, indent=4)
 
                 all_meters["_".join(lang)] = meters
                 print(f"{all_meters=}")

@@ -116,7 +116,7 @@ class Model(ABC):
 
             invoked_by = '%s/%s' % (Invoke.KEY, invoked_by)
             local_model_dir = snapshot_download(
-                model_name_or_path, revision, user_agent=invoked_by)
+                model_name_or_path, revision, user_agent=invoked_by, cache_dir=kwargs["cache_dir"])
             print(f"{local_model_dir=}")
         logger.info(f'initialize model from {local_model_dir}')
         if cfg_dict is not None:
