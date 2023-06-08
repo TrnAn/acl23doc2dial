@@ -143,13 +143,15 @@ def measure_result(result_dict):
         x.replace('<extra_id_0>', '') for x in result_dict['outputs']
     ]
 
-    pattern = r"^<response>\s*"
-    hypothesis_list = [re.sub(pattern, '', x) if len(x) > 10 else 'placeholder' for x in hypothesis_list]
+    pattern = r"^<response>\s*|^<[^>]+>\s*"
+    hypothesis_list = [re.sub(pattern, '', x)  for x in hypothesis_list] #if len(x) > 10 else 'placeholder'
     reference_list = [
         re.sub(pattern, '', x) for x in result_dict['targets']
     ] # .replace('<response>', '') 
     instance_num = len(reference_list)
 
+    print(f"{hypothesis_list=}")
+    print(f"{reference_list=}")
     # F1
     f1, em = matching_evaluate(reference_list, hypothesis_list)
     meters['f1'] = f1
@@ -435,9 +437,14 @@ def main():
         args.gradient_accumulation_steps = args.batch_size / (args.num_devices * args.per_gpu_batch_size)
 
     print(f"BATCH SIZE: {args.per_gpu_batch_size}")
-    eval_lang = [["en"]] if args.only_english else [["fr", "vi"], ["fr"], ["vi"]]
-    train(trainer, eval_lang=eval_lang, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4, loss_log_freq=1)
-    evaluate(trainer, eval_lang=eval_lang, checkpoint_path=os.path.join(trainer.model.model_dir,
+    eval_langs = []
+    if not args.extended_dataset or not bool(args.only_english):
+        eval_langs += [["fr", "vi"], ["fr"], ["vi"]]
+    if args.extended_dataset:
+        eval_langs.append(["en"])
+
+    train(trainer, eval_lang=eval_langs, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4, loss_log_freq=1)
+    evaluate(trainer, eval_lang=eval_langs, checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 
 

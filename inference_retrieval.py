@@ -38,8 +38,8 @@ def main():
         languages += ['fr', 'vi']
 
     if args.extended_dataset:
-        if not bool(args.only_chinese):
-            languages += ['en']
+        # if not bool(args.only_chinese):
+        languages += ['en']
         # if not bool(args.only_english):
         #     languages += ['cn']
 
@@ -54,7 +54,7 @@ def main():
         eval_dataset=eval_dataset,
         all_passages=all_passages,
         lang_token=args.lang_token,
-        eval_lang = [["en"]] if bool(args.only_english) else [["fr", "vi"], ["fr"], ["vi"]]
+        eval_lang = [args.eval_lang]
     )
 
     trainer.evaluate(

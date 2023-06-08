@@ -82,16 +82,21 @@ def main():
         languages += ['fr', 'vi']
 
     if args.extended_dataset:
-        if not bool(args.only_chinese):
-            languages += ['en']
-        if not bool(args.only_english):
-            languages += ['cn']
+        # if not bool(args.only_chinese):
+        languages += ['en']
+        # if not bool(args.only_english):
+        #     languages += ['cn']
 
     for file_name in languages:
         with open(f'{parent_dir}/{file_name}.json') as f:
             all_passages += json.load(f)
 
-        # use batch accumulation
+    eval_langs = []
+    if not args.extended_dataset or not bool(args.only_english):
+        eval_langs += [["fr", "vi"], ["fr"], ["vi"]]
+    if args.extended_dataset:
+        eval_langs.append(["en"])
+
     if args.batch_accumulation:
         args.gradient_accumulation_steps = args.batch_size // (args.num_devices * args.per_gpu_batch_size)
 
@@ -103,7 +108,7 @@ def main():
         eval_dataset=dev_dataset.to_dict('records'),
         all_passages=all_passages,
         lang_token  =args.lang_token,
-        eval_lang = [["en"]] if bool(args.only_english) else [["fr", "vi"], ["fr"], ["vi"]]
+        eval_lang = eval_langs
     )
     trainer.train(
         batch_size=128,

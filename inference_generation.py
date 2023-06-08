@@ -22,10 +22,10 @@ def main():
     args = parser.parse_args()
 
     parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"
-    with open(f'{parent_dir}/id_to_passage.json') as f:
+    with open(f'{parent_dir}/id_to_passage.json', encoding="utf-8") as f:
         id_to_passage = json.load(f)
     eval_dataset = []
-    with open(f'{args.cache_dir}/rerank_output.jsonl') as f:
+    with open(f'{args.cache_dir}/rerank_output.jsonl', encoding="utf-8") as f:
         for line in f.readlines():
             # print(line)
             sample = json.loads(line)
@@ -33,12 +33,12 @@ def main():
                 continue
             eval_dataset.append({
                 'query': sample['input'],
-                'rerank': json.dumps([id_to_passage[x['wikipedia_id']] for x in sample['output'][0]['provenance']],
-                                    ensure_ascii=False),
+                'rerank': eval(json.dumps([id_to_passage[x['wikipedia_id']] for x in sample['output'][0]['provenance']],
+                                    ensure_ascii=False)),
                 'response': sample['output'][0]['answer'], #'<response> @'
                 'lang': sample["lang"]
             })
-
+            
     cache_path = f'{args.cache_dir}/DAMO_ConvAI/nlp_convai_generation_pretrain'
     trainer = DocumentGroundedDialogGenerateTrainer(
         model=cache_path,

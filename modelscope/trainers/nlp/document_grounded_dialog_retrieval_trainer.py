@@ -66,6 +66,7 @@ def measure_result(result_dict):
     meters = {f'R@{k}': [] for k in recall_k}
     
     for output, target in zip(result_dict['outputs'], result_dict['targets']):
+        print(f"{output=} {target=}")
         for k in recall_k:
             if target in output[:k]:
                 meters[f'R@{k}'].append(1)

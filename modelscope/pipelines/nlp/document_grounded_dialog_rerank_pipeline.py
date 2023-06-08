@@ -24,7 +24,7 @@ from modelscope.pipelines.builder import PIPELINES
 from modelscope.preprocessors import DocumentGroundedDialogRerankPreprocessor
 from modelscope.utils.constant import Tasks
 from modelscope.utils.logger import get_logger
-
+from modelscope.trainers.nlp.document_grounded_dialog_retrieval_trainer import measure_result
 logger = get_logger()
 
 __all__ = ['DocumentGroundedDialogRerankPipeline']
@@ -96,6 +96,9 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
     def forward(self, dataset: Union[list, Dict[str, Any]],
                 **forward_params) -> Dict[str, Any]:
         report = Reporting()
+
+        outputs = []
+        targets = []
         self.guess = []
         with torch.no_grad():
             for jobj in dataset:
@@ -103,12 +106,14 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                 probs = self.one_instance(jobj['input_ids'],
                                           jobj['attention_mask'])
                 passages = jobj['passages']
+                positive_pids = jobj['positive_pids']
                 query = jobj['query']
                 lang = jobj["lang"] # add language info
                 answer = jobj['output'][0]['answer']
               
                 scored_pids = [(p['pid'], prob)
                                for p, prob in zip(passages, probs)]
+                               
                 scored_pids.sort(key=lambda x: x[1], reverse=True)
                 wids = to_distinct_doc_ids([
                     pid for pid, prob in scored_pids
@@ -130,6 +135,9 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                         } for wid in wids]
                     }]
                 }
+
+                outputs += [wids]
+                targets += positive_pids
                 if self.args['include_passages']:
                     pred_record['passages'] = passages
 
@@ -139,7 +147,14 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                     )
                 self.guess.append(pred_record)
         # if args['kilt_data']:
-        #     evaluate(dataset, args['output'])
+        # evaluate(dataset, self.guess) # args["output"]
+        result_dict = {'outputs': outputs,
+                       'targets': targets
+                       }
+   
+        meters = measure_result(result_dict)
+        print(f"{meters=}")
+
 
     def postprocess(self, inputs: list):
         return {OutputKeys.OUTPUT: inputs}
@@ -353,7 +368,7 @@ def _precision_at_k(rank, k):
 
 # 2. Recall computation
 def _recall_at_k(rank, num_distinct_evidence_sets, k):
-    r = rank[:k].count(True) / num_distinct_evidence_sets
+    r = rank[:k].count(True) / num_distinct_evidence_sets 
 
     return r
 
@@ -486,7 +501,9 @@ def get_ranking_metrics(guess_item, gold_item, ks, rank_keys):
     assert (
         'output' in guess_item and len(guess_item['output']) == 1
     ), f"guess should provide exactly one output for {guess_item['id']}"
+    print(f"{guess_item=}, {gold_item=}")
 
+    # print(f"{guess_item['passages'][0]['text'] == gold_item['output'][0]['answer']}")
     Rprec = rprecision(guess_item, gold_item, rank_keys=rank_keys)
     for k in ks:
 
@@ -729,14 +746,14 @@ def evaluate(gold, guess):
     pp = pprint.PrettyPrinter(indent=4)
 
     gold_records = gold
-    guess_records = load_data(guess)
-
+    # guess_records = load_data(guess)
+    guess_records = guess
     # 0. validate input
     gold_records, guess_records = validate_input(gold_records, guess_records)
 
     # 1. downstream + kilt
-    result = _calculate_metrics(gold_records, guess_records)
-
+    # result = _calculate_metrics(gold_records, guess_records)
+    result = {}
     # 2. retrieval performance
     retrieval_results = compute(
         gold_records,

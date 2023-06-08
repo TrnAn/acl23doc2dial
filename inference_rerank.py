@@ -72,7 +72,7 @@ def main():
         'output': model_dir,
         'max_batch_size': 64,
         'exclude_instances': '',
-        'include_passages': False,
+        'include_passages': True, #False,
         'do_lower_case': True,
         'max_seq_length': 512,
         'query_length': 195,
@@ -150,8 +150,8 @@ def main():
         languages += ['fr', 'vi']
         
     if args["extended_dataset"]:
-        if not bool(args["only_chinese"]):
-            languages += ['en']
+        # if not bool(args["only_chinese"]):
+        languages += ['en']
         # if not bool(args["only_english"]):
         #     languages += ['cn']
 
@@ -179,7 +179,10 @@ def main():
         now_input = x
         now_wikipedia = []
         now_passages = []
- 
+
+        if now_input["lang"] not in args["eval_lang"]:
+            continue
+
         all_candidates = retrieval_result[ptr]
         target = retrieval_targets[ptr]
         
@@ -203,20 +206,21 @@ def main():
                         'positive_pids': positive_pids_list, 'lang': lang_list}
 
 
-    dev_dataset = [
-        {key: value for key, value in zip(evaluate_dataset.keys(), values)}
-        for values in zip(*evaluate_dataset.values())
-    ]
+    # dev_dataset = [
+    #     {key: value for key, value in zip(evaluate_dataset.keys(), values)}
+    #     for values in zip(*evaluate_dataset.values())
+    # ]
 
-    args["device"] = "gpu"
-    trainer = DocumentGroundedDialogRerankTrainer(
-        model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 
-        train_dataset=[], 
-        dev_dataset=dev_dataset, 
-        args=args
-        )
+    # args["device"] = "gpu"
+    # trainer = DocumentGroundedDialogRerankTrainer(
+    #     model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 
+    #     train_dataset=[], 
+    #     dev_dataset=dev_dataset, 
+    #     args=args
+    #     )
 
-    trainer.evaluate(eval_lang=[args["eval_lang"]])
+    # trainer.evaluate(eval_lang=[args["eval_lang"]])
+    print(f"evaluation results on {','.join(args['eval_lang'])} language set")
     pipeline_ins(evaluate_dataset)
     pipeline_ins.save(f'./{args["cache_dir"]}/rerank_output.jsonl')
 
