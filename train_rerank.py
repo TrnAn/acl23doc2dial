@@ -82,6 +82,15 @@ def main():
         'gradient_accumulation_steps'] = args['full_train_batch_size'] // (
             args['per_gpu_train_batch_size'] * args['world_size'])
     
+    eval_langs = []
+    if not args["extended_dataset"] or not bool(args["only_english"]):
+        eval_langs += [["fr", "vi"], ["fr"], ["vi"]]
+        
+    if args["extended_dataset"]:
+        eval_langs.append(["en"])
+
+    # TODO: add english dataset from prev stage
+
     train_dataset_fr = MsDataset.load(
         'DAMO_ConvAI/FrDoc2BotRerank',
         download_mode=DownloadMode.REUSE_DATASET_IF_EXISTS,
@@ -118,6 +127,8 @@ def main():
     train_dataset = pd.concat([train_dataset_fr, train_dataset_vi]) 
     dev_dataset   = pd.concat([dev_dataset_fr, dev_dataset_vi]) 
 
+    train_dataset.head().to_csv("rerank_example.csv", index=0)
+    return
     trainer = DocumentGroundedDialogRerankTrainer(
         model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 
         train_dataset=train_dataset.to_dict('records'), 
@@ -126,7 +137,7 @@ def main():
         )
     
     trainer.train()
-    trainer.evaluate()
+    trainer.evaluate(eval_lang=eval_langs)
 
 
 if __name__ == '__main__':

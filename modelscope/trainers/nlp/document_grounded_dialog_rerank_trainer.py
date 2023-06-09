@@ -16,6 +16,7 @@ from modelscope.trainers import EpochBasedTrainer
 from modelscope.trainers.builder import TRAINERS
 from modelscope.utils.logger import get_logger
 from torch.utils.data import DataLoader
+from torchsummary import summary
 import json
 
 
@@ -58,8 +59,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         self.dev_dataset = dev_dataset
         print(f"{model=}")
         self.model = Model.from_pretrained(model, revision='v1.0.0', cache_dir=args["cache_dir"])
-
-        print(f"{self.model.model_dir=}")
+        summary(self.model)
         self.preprocessor = DocumentGroundedDialogRerankPreprocessor(
             self.model.model_dir, **args)
         self.tokenizer = self.preprocessor.tokenizer
@@ -212,6 +212,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
                 # nll = -(logits[target_mask].sum())  # TODO: instead take the weighted sum
                 nll = -(
                     logits.dot(torch.tensor(correctness).to(logits.device)))
+                print(f"{nll=}")
                 loss_val = self.optimizer.step_loss(nll)
                 self.loss_history.note_loss(loss_val)
                 if not self.optimizer.should_continue():
@@ -229,6 +230,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
             f'truncated to max length ({get_length}) {self.max_length_count} times'
         )
         save_transformer(self.args, self.optimizer.model, self.tokenizer)
+
 
 
     def evaluate(self, top_k:int=20, eval_lang:list= [["fr", "vi"], ["fr"], ["vi"]]):
@@ -279,11 +281,12 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
 
                     # print(f"{sorted_pairs[:top_k]=}")
                     top_k_passages = [pair[1]['text'] for pair in sorted_pairs[:top_k]]
-    
+
                     results['outputs'] += [top_k_passages]
 
                     id_text_dict = {d['pid']:d['text'] for d in passages}
                     results['targets'] += [id_text_dict[positive_pids[0]]]
+                    # id,input,output,passages,positive_pids,lang
 
                 meters = measure_result(results)
                 logger.info(f"save reranked passages to: {self.model.model_dir}...")

@@ -17,6 +17,9 @@ from modelscope.trainers import EpochBasedTrainer
 from modelscope.trainers.builder import TRAINERS
 from modelscope.utils.constant import ModeKeys
 from modelscope.utils.logger import get_logger
+from torchsummary import summary
+from utils.preprocessing import save_to_json
+import pandas as pd
 
 logger = get_logger()
 
@@ -83,6 +86,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
 
     def __init__(self, model: str, revision='v1.0.0', *args, **kwargs):
         self.model = Model.from_pretrained(model, revision=revision)
+        logger.info(f"{summary(self.model.model)}")
         self.preprocessor = DocumentGroundedDialogRetrievalPreprocessor(
             model_dir=self.model.model_dir, lang_token=kwargs["lang_token"])
         self.device = self.preprocessor.device
@@ -96,6 +100,8 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
         self.eval_dataset = kwargs['eval_dataset']
 
         self.all_passages = kwargs['all_passages']
+        self.retrieval_results = {}
+
 
     def train(self,
               total_epoches=20,
@@ -206,21 +212,16 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             all_ctx_vector = np.array(all_ctx_vector).astype('float32')
             faiss_index = faiss.IndexFlatIP(all_ctx_vector.shape[-1])
             faiss_index.add(all_ctx_vector) # context -> passages
-            
-            # valid_loader = DataLoader(
-            #         dataset=self.eval_dataset,
-            #         batch_size=per_gpu_batch_size,
-            #         collate_fn=collate)
-  
+
+            self.retrieval_results = {}
             all_meters = {}
             for idx, lang in enumerate(self.eval_lang):
-                print(f"{lang=}")
                 results = {'outputs': [], 'targets': []}
                 valid_loader = DataLoader(
                     dataset=self.eval_dataset,
                     batch_size=per_gpu_batch_size,
                     collate_fn=collate)
-                for payload in tqdm.tqdm(valid_loader):
+                for vid, payload in tqdm.tqdm(enumerate(valid_loader)):
                     query, positive, negative, curr_lang = payload
                     if bool(set(curr_lang) & set(lang)) == 0:
                         continue
@@ -240,7 +241,25 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                         self.all_passages[x] for x in retrieved_ids
                     ] for retrieved_ids in Index.tolist()]
                     results['targets'] += positive
-            
+
+                    # id,input,output,passages,positive_pids,lang
+                    if idx == 0:
+                        self.retrieval_results["id"]            += [vid]
+                        self.retrieval_results["input"]         += query
+                        self.retrieval_results["output"]        += [{'answer': '', 'provenance': [[
+                             {'wikipedia_id': str(x)} for x in retrieved_ids
+                            ] for retrieved_ids in Index.tolist()]
+                        }]
+                        # {'pid': '', 'title': '', 'text': ''}
+                        self.retrieval_results["passages"]      += [[
+                             {'pid': str(x), 'title':'', 'text': self.all_passages[x]} for x in retrieved_ids
+                            ] for retrieved_ids in Index.tolist()]
+                        self.retrieval_results["positive_pids"] += [[str(self.all_passages.index(p))] for p in positive]
+                        self.retrieval_results["lang"]     += curr_lang
+
+                print(f"{self.retrieval_results=}")
+                df = pd.DataFrame(self.retrieval_results)
+                save_to_json(df=df, export_cols=df.columns.tolist(), fname="en_rerank.json", dir= self.model.model_dir)
                 meters = measure_result(results)
 
                 logger.info(f"{'_'.join(lang)} - {meters}")
