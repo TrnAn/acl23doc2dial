@@ -153,7 +153,7 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                        }
    
         meters = measure_result(result_dict)
-        print(f"{meters=}")
+        logger.info(f"{meters=}")
 
 
     def postprocess(self, inputs: list):
@@ -501,9 +501,8 @@ def get_ranking_metrics(guess_item, gold_item, ks, rank_keys):
     assert (
         'output' in guess_item and len(guess_item['output']) == 1
     ), f"guess should provide exactly one output for {guess_item['id']}"
-    print(f"{guess_item=}, {gold_item=}")
 
-    # print(f"{guess_item['passages'][0]['text'] == gold_item['output'][0]['answer']}")
+
     Rprec = rprecision(guess_item, gold_item, rank_keys=rank_keys)
     for k in ks:
 

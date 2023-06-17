@@ -47,6 +47,7 @@ def main():
         with open(f'{parent_dir}/{file_name}.json') as f:
             all_passages += json.load(f)
 
+
     cache_path = f'{args.cache_dir}/DAMO_ConvAI/nlp_convai_retrieval_pretrain'
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
@@ -54,7 +55,8 @@ def main():
         eval_dataset=eval_dataset,
         all_passages=all_passages,
         lang_token=args.lang_token,
-        eval_lang = [args.eval_lang]
+        eval_lang = [args.eval_lang],
+        extended_dataset = args.extended_dataset
     )
 
     trainer.evaluate(

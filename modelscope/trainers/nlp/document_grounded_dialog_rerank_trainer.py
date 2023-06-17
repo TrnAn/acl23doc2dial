@@ -42,7 +42,7 @@ def measure_result(result_dict):
         meters[k] = sum(v) / len(v)
     return meters
 
-
+    
 @TRAINERS.register_module(
     module_name=Trainers.document_grounded_dialog_rerank_trainer)
 class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
@@ -63,7 +63,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         self.preprocessor = DocumentGroundedDialogRerankPreprocessor(
             self.model.model_dir, **args)
         self.tokenizer = self.preprocessor.tokenizer
-        if args['model_resize']:
+        if args['model_resize'] or args['lang_token']:
             self.model.resize_token_embeddings(len(self.tokenizer))
         self.device = self.preprocessor.device
         logger.info(f"{self.device=}")
@@ -75,7 +75,7 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         logger.info(
             f'gathered positive pids for {len(self.inst_id2pos_pids)} instances'
         )
-
+        self.eval_lang = args["eval_lang"]
         # remove out-of-recall
         instance_count = 0
         for jobj in self.train_dataset + self.dev_dataset:
@@ -212,14 +212,13 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
                 # nll = -(logits[target_mask].sum())  # TODO: instead take the weighted sum
                 nll = -(
                     logits.dot(torch.tensor(correctness).to(logits.device)))
-                print(f"{nll=}")
                 loss_val = self.optimizer.step_loss(nll)
                 self.loss_history.note_loss(loss_val)
                 if not self.optimizer.should_continue():
                     break
                 
-                # evaluate model
-            meters = self.evaluate()
+            # evaluate model
+            meters = self.evaluate(eval_lang=self.eval_lang)
             total_score = sum(sum(meter.values()) for meter in meters.values())
             logger.info(
                 f'obtain max score: {total_score:.4f}')
@@ -273,20 +272,18 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
                         passages, correctness, rand)
 
                     logits = self.one_instance(query, passages) 
-                    # print(f"{logits=}")   
+                   
                     score_passage_pairs = zip(logits, passages)
                     # curr_lang = re.match(r"<.*?>")
                     # score_passage_pairs = [ l, p in zip(logits, passages) if p.startswith(curr_lang)] # contraint on: same lang
                     sorted_pairs = sorted(score_passage_pairs, key=lambda x: x[0], reverse=True)
-
-                    # print(f"{sorted_pairs[:top_k]=}")
                     top_k_passages = [pair[1]['text'] for pair in sorted_pairs[:top_k]]
 
                     results['outputs'] += [top_k_passages]
 
                     id_text_dict = {d['pid']:d['text'] for d in passages}
                     results['targets'] += [id_text_dict[positive_pids[0]]]
-                    # id,input,output,passages,positive_pids,lang
+         
 
                 meters = measure_result(results)
                 logger.info(f"save reranked passages to: {self.model.model_dir}...")

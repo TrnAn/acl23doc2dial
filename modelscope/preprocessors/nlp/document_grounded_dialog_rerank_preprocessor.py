@@ -11,6 +11,7 @@ from modelscope.preprocessors import Preprocessor
 from modelscope.preprocessors.builder import PREPROCESSORS
 from modelscope.utils.constant import Fields, ModeKeys, ModelFile
 from modelscope.utils.type_assert import type_assert
+from utils.preprocessing import LANG_TOKENS_DD
 
 
 @PREPROCESSORS.register_module(
@@ -37,6 +38,8 @@ class DocumentGroundedDialogRerankPreprocessor(Preprocessor):
                 '<last_turn>', '<user>', '<agent>', '<response>', '<passage>'
             ]
             self.tokenizer.add_tokens(special_tokens)
+        if kwargs["lang_token"]:
+            self.tokenizer.add_tokens(LANG_TOKENS_DD.values())
 
     @type_assert(object, Dict)
     def __call__(self, data: Dict[str, Any],
@@ -60,7 +63,9 @@ class DocumentGroundedDialogRerankPreprocessor(Preprocessor):
                 query_ids = self.tokenizer(
                     [now_query], add_special_tokens=False,
                     return_tensors='pt')['input_ids'][0][:self.query_length]
-                now_query = self.tokenizer.decode(query_ids)
+                now_query = self.tokenizer.decode(query_ids, max_length=self.max_seq_length,
+                    padding='longest',
+                    truncation=True)
                 # passage
                 texts_b = []
                 for p in now_passages:
@@ -98,8 +103,13 @@ class DocumentGroundedDialogRerankPreprocessor(Preprocessor):
             # query
             query_ids = self.tokenizer(
                 [query], add_special_tokens=False,
-                return_tensors='pt')['input_ids'][0][:self.query_length]
-            query = self.tokenizer.decode(query_ids)
+                return_tensors='pt',
+                max_length=self.max_seq_length,
+                padding='longest',
+                truncation=True)['input_ids'][0][:self.query_length]
+            query = self.tokenizer.decode(query_ids, max_length=self.max_seq_length,
+                padding='longest',
+                truncation=True)
             # passage
             texts_b = []
             for p in passages:

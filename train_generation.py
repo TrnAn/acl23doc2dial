@@ -150,8 +150,6 @@ def measure_result(result_dict):
     ] # .replace('<response>', '') 
     instance_num = len(reference_list)
 
-    print(f"{hypothesis_list=}")
-    print(f"{reference_list=}")
     # F1
     f1, em = matching_evaluate(reference_list, hypothesis_list)
     meters['f1'] = f1
@@ -196,7 +194,7 @@ def train(trainer,
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate,
-        num_workers=4,
+        num_workers=2,
         pin_memory=True)
 
     optimizer = prepare_optimizer(trainer.model.model, learning_rate,
@@ -336,7 +334,7 @@ def main():
     parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
     parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
     parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 16)
-    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 1)
+    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 16)
     parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
     parser.add_argument("--only-english", help= "Run experiments only on English dataset", type= int, default=0)
     parser.add_argument("--only-chinese", help= "Run experiments only on Chinese dataset", type= int, default=0)
@@ -352,15 +350,13 @@ def main():
     if args.extended_dataset:
         if not bool(args.only_chinese):
             en_train_dataset = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
-            # n = int(len(en_train_dataset) * 0.7)  # Number of samples to select, 75% of the DataFrame
-            # en_train_dataset = en_train_dataset.sample(n=n, random_state = 42)
             en_train_dataset["lang"] = "en"
             en_train_dataset = en_train_dataset.rename({"passages": "rerank"},  axis='columns')
   
-        if not bool(args.only_english):
-            cn_train_dataset = pd.read_json("cn_train_dataset_in_domain.json", lines=True)
-            cn_train_dataset["lang"] = "cn"
-            cn_train_dataset = cn_train_dataset.rename({"passages": "rerank"},  axis='columns')
+        # if not bool(args.only_english):
+        #     cn_train_dataset = pd.read_json("cn_train_dataset_in_domain.json", lines=True)
+        #     cn_train_dataset["lang"] = "cn"
+        #     cn_train_dataset = cn_train_dataset.rename({"passages": "rerank"},  axis='columns')
 
 
         # cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
@@ -441,7 +437,7 @@ def main():
     if not args.extended_dataset or not bool(args.only_english):
         eval_langs += [["fr", "vi"], ["fr"], ["vi"]]
     if args.extended_dataset:
-        eval_langs.append(["en"])
+        eval_langs += [["en"]]
 
     train(trainer, eval_lang=eval_langs, batch_size=args.per_gpu_batch_size, accumulation_steps=args.gradient_accumulation_steps, total_epoches=10, learning_rate=1e-4, loss_log_freq=1)
     evaluate(trainer, eval_lang=eval_langs, checkpoint_path=os.path.join(trainer.model.model_dir,

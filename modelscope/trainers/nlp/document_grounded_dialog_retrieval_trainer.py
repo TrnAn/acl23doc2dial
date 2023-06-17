@@ -20,7 +20,7 @@ from modelscope.utils.logger import get_logger
 from torchsummary import summary
 from utils.preprocessing import save_to_json
 import pandas as pd
-
+from typing import Union, Any, Dict
 logger = get_logger()
 
 
@@ -69,7 +69,6 @@ def measure_result(result_dict):
     meters = {f'R@{k}': [] for k in recall_k}
     
     for output, target in zip(result_dict['outputs'], result_dict['targets']):
-        print(f"{output=} {target=}")
         for k in recall_k:
             if target in output[:k]:
                 meters[f'R@{k}'].append(1)
@@ -100,7 +99,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
         self.eval_dataset = kwargs['eval_dataset']
 
         self.all_passages = kwargs['all_passages']
-        self.retrieval_results = {}
+        self.is_extended_dataset = kwargs['extended_dataset']
 
 
     def train(self,
@@ -181,6 +180,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 logger.info(
                     'epoch %d obtain max score: %.4f, saving model to %s' %
                     (epoch, total_score, model_path))
+                
 
     def evaluate(self, per_gpu_batch_size=32, checkpoint_path=None):
         """
@@ -242,28 +242,10 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     ] for retrieved_ids in Index.tolist()]
                     results['targets'] += positive
 
-                    # id,input,output,passages,positive_pids,lang
-                    if idx == 0:
-                        self.retrieval_results["id"]            += [vid]
-                        self.retrieval_results["input"]         += query
-                        self.retrieval_results["output"]        += [{'answer': '', 'provenance': [[
-                             {'wikipedia_id': str(x)} for x in retrieved_ids
-                            ] for retrieved_ids in Index.tolist()]
-                        }]
-                        # {'pid': '', 'title': '', 'text': ''}
-                        self.retrieval_results["passages"]      += [[
-                             {'pid': str(x), 'title':'', 'text': self.all_passages[x]} for x in retrieved_ids
-                            ] for retrieved_ids in Index.tolist()]
-                        self.retrieval_results["positive_pids"] += [[str(self.all_passages.index(p))] for p in positive]
-                        self.retrieval_results["lang"]     += curr_lang
-
-                print(f"{self.retrieval_results=}")
-                df = pd.DataFrame(self.retrieval_results)
-                save_to_json(df=df, export_cols=df.columns.tolist(), fname="en_rerank.json", dir= self.model.model_dir)
                 meters = measure_result(results)
 
                 logger.info(f"{'_'.join(lang)} - {meters}")
-                if idx == 0:
+                if lang == ["fr", "vi"] or (lang == ["en"] and self.is_extended_dataset):
                     result_path = os.path.join(self.model.model_dir,
                         f'evaluate_result.json')
                     logger.info(f"saving evaluate_result.json...")
@@ -271,5 +253,68 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                         json.dump(results, f, ensure_ascii=False, indent=4)
 
                 all_meters["_".join(lang)] = meters
-                print(f"{all_meters=}")
+                logger.info(f"{all_meters=}")
         return all_meters
+
+
+    def save_dataset(self, dataset: Union[list, Dict[str, Any]],  per_gpu_batch_size=32, fname:str="en_rerank.json"):
+        retrieval_results = []
+        self.guess = []
+        with torch.no_grad():
+            all_ctx_vector = []
+            for mini_batch in tqdm.tqdm(
+                    range(0, len(self.all_passages), per_gpu_batch_size)):
+                context = self.all_passages[mini_batch:mini_batch
+                                            + per_gpu_batch_size]
+                processed = \
+                    self.preprocessor({'context': context},
+                                        invoke_mode=ModeKeys.INFERENCE,
+                                        input_type='context')
+                sub_ctx_vector = self.model.encode_context(
+                    processed).detach().cpu().numpy()
+                all_ctx_vector.append(sub_ctx_vector)
+
+            all_ctx_vector = np.concatenate(all_ctx_vector, axis=0)
+            all_ctx_vector = np.array(all_ctx_vector).astype('float32')
+            faiss_index = faiss.IndexFlatIP(all_ctx_vector.shape[-1])
+            faiss_index.add(all_ctx_vector) # context -> passages
+
+            for jobj in tqdm.tqdm(dataset):
+                keys = ["id", "input", "lang", "output", "passages", "positive_pids"]
+                default_value = []
+                tmp = dict.fromkeys(keys, default_value)
+
+                index = jobj["index"]
+                lang = jobj["lang"]
+                query = jobj["query"]
+                positive = jobj["positive"]
+         
+                processed       = self.preprocessor({'query': [query]}, invoke_mode=ModeKeys.INFERENCE)
+                query_vector    = self.model.encode_query(processed).detach().cpu().numpy().astype('float32')
+   
+                # get ranked passages top-k
+                _, Index = faiss_index.search(query_vector, 20)
+
+                # if ranked passages do not contain positive pid -> add it as top 1
+                ranked_indices = Index.tolist()[0]
+                if self.all_passages.index(positive) not in ranked_indices:
+                    ranked_indices = [self.all_passages.index(positive)] + Index.tolist()[0][:-1]
+                
+                tmp["id"] = index
+                tmp["input"] = query
+                tmp["lang"] = lang
+                tmp["positive_pids"] = json.dumps([str(self.all_passages.index(positive))])
+                provenance = json.dumps([{'wikipedia_id': str(retrieved_ids)}  for retrieved_ids in ranked_indices])
+                
+                tmp["output"]   = json.dumps([{'answer': '', 'provenance': provenance}])
+                tmp["passages"] = json.dumps([{
+                    'pid': str(retrieved_ids), 
+                    'title':'', 
+                    'text': self.all_passages[retrieved_ids]} for retrieved_ids in ranked_indices])
+                retrieval_results.append(tmp)
+
+            # Save the list of dictionaries as JSON with ensure_ascii=False
+            path = os.path.join(self.model.model_dir, fname)
+            logger.info(f"saving dataset for rerank training to {path}...")
+            with open(path, "w") as json_file:
+                json.dump(retrieval_results, json_file, ensure_ascii=False, indent=4)

@@ -115,7 +115,8 @@ def main():
         'global_rank': 0,
         'local_rank': -1,
         'tokenizer_resize': True,
-        'model_resize': True
+        'model_resize': True,
+        'extended_dataset': args["extended_dataset"]
     })
     model = Model.from_pretrained(model_dir, **args)
     mypreprocessor = DocumentGroundedDialogRerankPreprocessor(
@@ -222,7 +223,9 @@ def main():
     # trainer.evaluate(eval_lang=[args["eval_lang"]])
     print(f"evaluation results on {','.join(args['eval_lang'])} language set")
     pipeline_ins(evaluate_dataset)
-    pipeline_ins.save(f'./{args["cache_dir"]}/rerank_output.jsonl')
+
+    if args["eval_lang"] == ["fr", "vi"] or (args["eval_lang"] == ["en"] and args["extended_dataset"]):
+        pipeline_ins.save(f'./{args["cache_dir"]}/rerank_output.jsonl')
 
 
 if __name__ == '__main__':

@@ -15,19 +15,6 @@ from utils.seed import set_seed
 set_seed()
 
 
-def split_dataset(dataset:list, seed:int=42, split_ratio:float=.9):
-    random.seed(seed)
-    random.shuffle(dataset)
-
-    # Calculate the split points
-    train_size = int(split_ratio * len(dataset))
-
-    # Split the data into training and testing sets
-    train_ds = dataset[:train_size]
-    dev_ds = dataset[train_size:]
-    return train_ds, dev_ds
-
-
 def main():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
@@ -83,13 +70,24 @@ def main():
             args['per_gpu_train_batch_size'] * args['world_size'])
     
     eval_langs = []
-    if not args["extended_dataset"] or not bool(args["only_english"]):
+    if not bool(args["only_english"]):
         eval_langs += [["fr", "vi"], ["fr"], ["vi"]]
         
     if args["extended_dataset"]:
-        eval_langs.append(["en"])
+        eval_langs += [["en"]]
 
-    # TODO: add english dataset from prev stage
+    args["eval_lang"] = eval_langs
+
+    en_train_dataset, cn_train_dataset = None, None
+    if args["extended_dataset"]:
+        if not bool(args["only_chinese"]):
+            en_train_dataset = pd.read_json(f"{args['cache_dir']}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/en_rerank.json")
+
+            en_train_dataset["lang"]        = "en"
+            en_train_dataset['output']      = en_train_dataset['output'].apply(eval)
+            # if not args["lang_token"]:
+            #     en_train_dataset['passages']    = en_train_dataset['passages'].apply(eval)
+
 
     train_dataset_fr = MsDataset.load(
         'DAMO_ConvAI/FrDoc2BotRerank',
@@ -108,27 +106,34 @@ def main():
 
     train_dataset_fr, dev_dataset_fr = preprocessing.test_split(train_dataset_fr)
     train_dataset_vi, dev_dataset_vi = preprocessing.test_split(train_dataset_vi)
-
+    train_dataset_en, dev_dataset_en = preprocessing.test_split(en_train_dataset)
 
     if args["lang_token"]:
         train_dataset_fr      = preprocessing.add_lang_token(train_dataset_fr, "fr", ["input"]) 
         train_dataset_vi      = preprocessing.add_lang_token(train_dataset_vi, "vi", ["input"]) 
+        # train_dataset_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["input"]) 
 
         dev_dataset_fr = preprocessing.add_lang_token(dev_dataset_fr, "fr", ["input"]) 
         dev_dataset_vi = preprocessing.add_lang_token(dev_dataset_vi, "vi", ["input"]) 
+        # dev_dataset_en = preprocessing.add_lang_token(dev_dataset_en, "en", ["input"]) 
 
-        train_dataset_fr['passages'] = train_dataset_fr['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['fr']} {d['text']}"} for d in literal_eval(x)]))
-        dev_dataset_fr['passages'] = dev_dataset_fr['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['fr']} {d['text']}"} for d in literal_eval(x)])) 
-        train_dataset_vi['passages'] = train_dataset_vi['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['vi']} {d['text']}"} for d in literal_eval(x)]))
-        dev_dataset_vi['passages'] = dev_dataset_vi['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['vi']} {d['text']}"} for d in literal_eval(x)]))
+        train_dataset_fr['passages'] = train_dataset_fr['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['fr']} {d['text']}"} for d in eval(x)]))
+        dev_dataset_fr['passages'] = dev_dataset_fr['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['fr']} {d['text']}"} for d in eval(x)])) 
+        train_dataset_vi['passages'] = train_dataset_vi['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['vi']} {d['text']}"} for d in eval(x)]))
+        dev_dataset_vi['passages'] = dev_dataset_vi['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['vi']} {d['text']}"} for d in eval(x)]))
+        # train_dataset_en['passages'] = train_dataset_en['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['en']} {d['text']}"} for d in eval(x)]))
+        # dev_dataset_en['passages'] = dev_dataset_en['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['en']} {d['text']}"} for d in eval(x)]))
 
     print(f"split size: {len(train_dataset_vi)=} - {len(dev_dataset_vi)=}; {len(train_dataset_fr)=} - {len(dev_dataset_fr)=}")
-    
-    train_dataset = pd.concat([train_dataset_fr, train_dataset_vi]) 
-    dev_dataset   = pd.concat([dev_dataset_fr, dev_dataset_vi]) 
 
-    train_dataset.head().to_csv("rerank_example.csv", index=0)
-    return
+    if bool(args["only_english"]):
+        train_dataset   = train_dataset_en
+        dev_dataset     = dev_dataset_en
+    else:
+        train_dataset = pd.concat([train_dataset_fr, train_dataset_vi]) 
+        dev_dataset   = pd.concat([dev_dataset_fr, dev_dataset_vi]) 
+
+    
     trainer = DocumentGroundedDialogRerankTrainer(
         model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 
         train_dataset=train_dataset.to_dict('records'), 

@@ -38,9 +38,9 @@ def main():
         if not bool(args.only_chinese):
             en_train_dataset = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
             en_train_dataset["lang"] = "en"
-        if not bool(args.only_english):
-            cn_train_dataset = pd.read_json("cn_train_dataset_in_domain.json", lines=True)
-            cn_train_dataset["lang"] = "cn"
+        # if not bool(args.only_english):
+        #     cn_train_dataset = pd.read_json("cn_train_dataset_in_domain.json", lines=True)
+        #     cn_train_dataset["lang"] = "cn"
 
 
 
@@ -95,7 +95,7 @@ def main():
     if not args.extended_dataset or not bool(args.only_english):
         eval_langs += [["fr", "vi"], ["fr"], ["vi"]]
     if args.extended_dataset:
-        eval_langs.append(["en"])
+        eval_langs += [["en"]]
 
     if args.batch_accumulation:
         args.gradient_accumulation_steps = args.batch_size // (args.num_devices * args.per_gpu_batch_size)
@@ -108,7 +108,8 @@ def main():
         eval_dataset=dev_dataset.to_dict('records'),
         all_passages=all_passages,
         lang_token  =args.lang_token,
-        eval_lang = eval_langs
+        eval_lang = eval_langs,
+        extended_dataset = args.extended_dataset
     )
     trainer.train(
         batch_size=128,
@@ -120,7 +121,9 @@ def main():
     trainer.evaluate(
         checkpoint_path=os.path.join(trainer.model.model_dir,
                                     'finetuned_model.bin'))
-
+    if args.extended_dataset:
+        combined_df = pd.concat([train_dataset, dev_dataset]).reset_index()
+        trainer.save_dataset(combined_df.to_dict('records'))
 
 
 if __name__ == '__main__':
