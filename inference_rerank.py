@@ -12,6 +12,7 @@ from modelscope.trainers.nlp.document_grounded_dialog_rerank_trainer import \
 from typing import Union
 import argparse
 from utils.seed import set_seed
+from utils.preprocessing import get_args, get_unique_langs
 set_seed()
 
 
@@ -40,18 +41,8 @@ class myDocumentGroundedDialogRerankPipeline(DocumentGroundedDialogRerankPipelin
             file_out.write(json.dumps(every_dict) + '\n')
 
 
-def main():
-    parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
-    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
-    parser.add_argument("--only-english", help= "Run experiments only on English dataset", type= int, default=0)
-    parser.add_argument("--only-chinese", help= "Run experiments only on Chinese dataset", type= int, default=0)
-    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
-    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
-    parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
-    parser.add_argument("--eval-lang", help= "Specify languages to evaluate results on",  action='store',type=str, nargs="+")
-    args = vars(parser.parse_args())
-
-    model_dir = f'./{args["cache_dir"]}/output'
+def main(**kwargs):
+    model_dir = f'./{kwargs["cache_dir"]}/output'
     model_configuration = {
         "framework": "pytorch",
         "task": "document-grounded-dialog-rerank",
@@ -65,10 +56,11 @@ def main():
             "type": "document-grounded-dialog-rerank"
         }
     }
+
     file_out = open(f'{model_dir}/configuration.json', 'w')
     json.dump(model_configuration, file_out, indent=4)
     file_out.close()
-    args.update({
+    kwargs.update({
         'output': model_dir,
         'max_batch_size': 64,
         'exclude_instances': '',
@@ -78,54 +70,21 @@ def main():
         'query_length': 195,
         'tokenizer_resize': True,
         'model_resize': True,
-        'kilt_data': True,
-        'cache_dir': args["cache_dir"],
-        'seed': 42,
-        'tokenizer_name': '',
-        'instances_size': 1,
-        'output_dir': f'{args["cache_dir"]}/output',
-        'max_num_seq_pairs_per_device': 32,
-        'full_train_batch_size': 32,
-        'gradient_accumulation_steps': 32,
-        'per_gpu_train_batch_size': 1,
-        'num_train_epochs': 1, # 10,
-        'train_instances': -1,
-        'learning_rate': 2e-5,
-        'max_seq_length': 512,
-        'num_labels': 2,
-        'fold': '',  # IofN
-        'doc_match_weight': 0.0,
-        'query_length': 195,
-        'resume_from': '',  # to resume training from a checkpoint
-        'config_name': '',
-        'do_lower_case': True,
-        'weight_decay': 0.0,  # previous default was 0.01
-        'adam_epsilon': 1e-8,
-        'max_grad_norm': 1.0,
-        'warmup_instances': 0,  # previous default was 0.1 of total
-        'warmup_fraction': 0.0,  # only applies if warmup_instances <= 0
-        'no_cuda': False,
-        'n_gpu': 1,
-        'seed': 42,
-        'fp16': False,
-        'fp16_opt_level': 'O1',  # previous default was O2
-        'per_gpu_eval_batch_size': 8,
-        'log_on_all_nodes': False,
-        'world_size': 1,
-        'global_rank': 0,
-        'local_rank': -1,
-        'tokenizer_resize': True,
-        'model_resize': True,
-        'extended_dataset': args["extended_dataset"]
+        'kilt_data': True
     })
-    model = Model.from_pretrained(model_dir, **args)
+
+    
+    langs = get_unique_langs(kwargs["eval_lang"])
+    kwargs["eval_lang"] = kwargs["eval_lang"][0]
+
+    model = Model.from_pretrained(model_dir, **kwargs)
     mypreprocessor = DocumentGroundedDialogRerankPreprocessor(
-        model.model_dir, **args)
+        model.model_dir, **kwargs)
 
     pipeline_ins = myDocumentGroundedDialogRerankPipeline(
-        model=model, preprocessor=mypreprocessor, **args)
+        model=model, preprocessor=mypreprocessor, **kwargs)
 
-    file_in = open(f'./{args["cache_dir"]}/input.jsonl', 'r')
+    file_in = open(f'./{kwargs["cache_dir"]}/input.jsonl', 'r', encoding="utf-8-sig")
     all_querys = []
     for every_query in file_in:
         all_querys.append(json.loads(every_query))
@@ -144,27 +103,21 @@ def main():
 
     passage_to_id = {}
     ptr = -1
-    parent_dir = "all_passages/lang_token" if args["lang_token"] else "all_passages"
-    
-    languages = []
-    if not bool(args["only_english"]):
-        languages += ['fr', 'vi']
-        
-    if args["extended_dataset"]:
-        # if not bool(args["only_chinese"]):
-        languages += ['en']
-        # if not bool(args["only_english"]):
-        #     languages += ['cn']
+    parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
 
-    for file_name in languages:
-        with open(f'./{parent_dir}/{file_name}.json') as f:
+    # replace native lang wth translations vi -> vi2en; fr -> fr2en
+    for file_name in ["fr", "vi", "en"]:
+        with open(f'./{parent_dir}/{file_name}.json', encoding="utf-8-sig") as f:
             all_passages = json.load(f)
             for every_passage in all_passages:
                 ptr += 1
-                passage_to_id[every_passage] = str(ptr)
+                passage_to_id[every_passage.strip()] = str(ptr)
 
-    file_in = open(f'{args["cache_dir"]}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/evaluate_result.json', 'r')
-    retrieval_file      = json.load(file_in)
+    # translate evaluate_result
+    with open(f'{kwargs["cache_dir"]}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/evaluate_result.json', encoding="utf-8-sig") as file_in:
+        retrieval_file = json.load(file_in)
+
+    # print(f"{langs=}")
     retrieval_result    = retrieval_file['outputs'] # predicted
     retrieval_targets   = retrieval_file['targets']
     input_list = []
@@ -174,6 +127,7 @@ def main():
     output_list = []
     positive_pids_list = []
     ptr = -1
+
     for x in tqdm(all_querys):
         ptr += 1
         now_id = str(ptr)
@@ -181,15 +135,16 @@ def main():
         now_wikipedia = []
         now_passages = []
 
-        if now_input["lang"] not in args["eval_lang"]:
+        # print(f"{now_input['lang']=} ; {langs=}")
+        if now_input["lang"] not in langs:
             continue
-
+        
         all_candidates = retrieval_result[ptr]
         target = retrieval_targets[ptr]
         
-        for idx, every_passage in enumerate(all_candidates):
-            get_pid = passage_to_id[every_passage]
-            get_positive_pid = passage_to_id[target]
+        for every_passage in all_candidates:
+            get_pid = passage_to_id[every_passage.strip()]
+            get_positive_pid = passage_to_id[target.strip()]
             now_wikipedia.append({'wikipedia_id': str(get_pid)})
             now_passages.append({"pid": str(get_pid), "title": "", "text": every_passage})
         now_output = [{'answer': target, 'provenance': now_wikipedia}]
@@ -206,27 +161,16 @@ def main():
     evaluate_dataset = {'input': input_list, 'id': ids_list, 'passages': passages_list, 'output': output_list,
                         'positive_pids': positive_pids_list, 'lang': lang_list}
 
-
-    # dev_dataset = [
-    #     {key: value for key, value in zip(evaluate_dataset.keys(), values)}
-    #     for values in zip(*evaluate_dataset.values())
-    # ]
-
-    # args["device"] = "gpu"
-    # trainer = DocumentGroundedDialogRerankTrainer(
-    #     model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 
-    #     train_dataset=[], 
-    #     dev_dataset=dev_dataset, 
-    #     args=args
-    #     )
-
-    # trainer.evaluate(eval_lang=[args["eval_lang"]])
-    print(f"evaluation results on {','.join(args['eval_lang'])} language set")
+    print(f"evaluation results on {'_'.join(langs)} language set:")
     pipeline_ins(evaluate_dataset)
 
-    if args["eval_lang"] == ["fr", "vi"] or (args["eval_lang"] == ["en"] and args["extended_dataset"]):
-        pipeline_ins.save(f'./{args["cache_dir"]}/rerank_output.jsonl')
+    print(f'{kwargs["save_output"]=}')
+    if kwargs["save_output"]:
+        print(f"save rerank_output.jsonl...")
+        pipeline_ins.save(f'./{kwargs["cache_dir"]}/rerank_output.jsonl')
 
 
 if __name__ == '__main__':
-    main()
+    kwargs = {}
+    kwargs.update(get_args())
+    main(**kwargs)

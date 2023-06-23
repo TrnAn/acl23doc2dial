@@ -240,17 +240,17 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
 
         self.optimizer.model.eval()
         all_meters ={}
-        for idx, lang in enumerate(eval_lang):
+        for lang in eval_lang:
             with torch.no_grad():
                 results = {'outputs': [], 'targets': []}
-                dataset = block_shuffle(self.dev_dataset, block_size=100000, rand=rand)
+                dataset = list(block_shuffle(self.dev_dataset, block_size=100000, rand=rand))
                 for line_ndx, jobj in enumerate(dataset):
-                    
-                    if jobj['lang'] not in lang:     
+                    if jobj['lang'] not in lang:  
                         continue
-                    
+
                     inst_id = jobj['id']
                     if inst_id not in self.inst_id2pos_pids:
+                        print(f"not there: {inst_id=}")
                         continue
                     if line_ndx % self.args['world_size'] != \
                             self.args['global_rank']:
@@ -278,13 +278,12 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
                     # score_passage_pairs = [ l, p in zip(logits, passages) if p.startswith(curr_lang)] # contraint on: same lang
                     sorted_pairs = sorted(score_passage_pairs, key=lambda x: x[0], reverse=True)
                     top_k_passages = [pair[1]['text'] for pair in sorted_pairs[:top_k]]
-
+               
                     results['outputs'] += [top_k_passages]
 
                     id_text_dict = {d['pid']:d['text'] for d in passages}
                     results['targets'] += [id_text_dict[positive_pids[0]]]
-         
-
+     
                 meters = measure_result(results)
                 logger.info(f"save reranked passages to: {self.model.model_dir}...")
                 result_path = os.path.join(self.model.model_dir,

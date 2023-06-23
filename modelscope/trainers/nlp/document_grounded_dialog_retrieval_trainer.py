@@ -85,7 +85,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
 
     def __init__(self, model: str, revision='v1.0.0', *args, **kwargs):
         self.model = Model.from_pretrained(model, revision=revision)
-        logger.info(f"{summary(self.model.model)}")
+        print(summary(self.model.model))
         self.preprocessor = DocumentGroundedDialogRetrievalPreprocessor(
             model_dir=self.model.model_dir, lang_token=kwargs["lang_token"])
         self.device = self.preprocessor.device
@@ -95,12 +95,10 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             self.model.model.ctx_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize context encoder of DPR model
 
         self.model.model.to(self.device)
-        self.train_dataset = kwargs['train_dataset']
-        self.eval_dataset = kwargs['eval_dataset']
-
-        self.all_passages = kwargs['all_passages']
-        self.is_extended_dataset = kwargs['extended_dataset']
-
+        self.train_dataset  = kwargs['train_dataset']
+        self.eval_dataset   = kwargs['eval_dataset']
+        self.all_passages   = kwargs['all_passages']
+        self.save_output    = kwargs['save_output']
 
     def train(self,
               total_epoches=20,
@@ -120,6 +118,8 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             dataset=self.train_dataset,
             batch_size=batch_size,
             shuffle=True,
+            num_workers=2,
+            pin_memory=True,
             collate_fn=collate)
 
         optimizer = prepare_optimizer(self.model.model, learning_rate,
@@ -221,9 +221,10 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     dataset=self.eval_dataset,
                     batch_size=per_gpu_batch_size,
                     collate_fn=collate)
-                for vid, payload in tqdm.tqdm(enumerate(valid_loader)):
+                for payload in tqdm.tqdm(valid_loader):
                     query, positive, negative, curr_lang = payload
-                    if bool(set(curr_lang) & set(lang)) == 0:
+
+                    if bool(set(curr_lang) & set(lang)) == 0: # language is not in current batch
                         continue
 
                     query, positive, negative, curr_lang = zip(*[(q, p, n, l) for q, p, n, l in zip(query, positive, negative, curr_lang) if l in lang])
@@ -245,10 +246,13 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 meters = measure_result(results)
 
                 logger.info(f"{'_'.join(lang)} - {meters}")
-                if lang == ["fr", "vi"] or (lang == ["en"] and self.is_extended_dataset):
+                
+                #(lang == self.eval_lang[0] and len(self.eval_lang) > 1) or 
+                if self.save_output:
                     result_path = os.path.join(self.model.model_dir,
                         f'evaluate_result.json')
                     logger.info(f"saving evaluate_result.json...")
+
                     with open(result_path, 'w') as f:
                         json.dump(results, f, ensure_ascii=False, indent=4)
 
@@ -257,7 +261,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
         return all_meters
 
 
-    def save_dataset(self, dataset: Union[list, Dict[str, Any]],  per_gpu_batch_size=32, fname:str="en_rerank.json"):
+    def save_dataset(self, dataset: Union[list, Dict[str, Any]],  per_gpu_batch_size=32, fname:str="rerank_dataset.json"):
         retrieval_results = []
         self.guess = []
         with torch.no_grad():
@@ -276,6 +280,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
 
             all_ctx_vector = np.concatenate(all_ctx_vector, axis=0)
             all_ctx_vector = np.array(all_ctx_vector).astype('float32')
+
             faiss_index = faiss.IndexFlatIP(all_ctx_vector.shape[-1])
             faiss_index.add(all_ctx_vector) # context -> passages
 
@@ -304,13 +309,13 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 tmp["input"] = query
                 tmp["lang"] = lang
                 tmp["positive_pids"] = json.dumps([str(self.all_passages.index(positive))])
-                provenance = json.dumps([{'wikipedia_id': str(retrieved_ids)}  for retrieved_ids in ranked_indices])
+                provenance = [{'wikipedia_id': str(retrieved_ids)}  for retrieved_ids in ranked_indices]
                 
                 tmp["output"]   = json.dumps([{'answer': '', 'provenance': provenance}])
                 tmp["passages"] = json.dumps([{
                     'pid': str(retrieved_ids), 
                     'title':'', 
-                    'text': self.all_passages[retrieved_ids]} for retrieved_ids in ranked_indices])
+                    'text': self.all_passages[retrieved_ids]} for retrieved_ids in ranked_indices], ensure_ascii=False)
                 retrieval_results.append(tmp)
 
             # Save the list of dictionaries as JSON with ensure_ascii=False

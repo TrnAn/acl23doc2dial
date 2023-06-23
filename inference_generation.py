@@ -7,29 +7,22 @@ import datetime
 import argparse
 import pandas as pd
 from utils.seed import set_seed
+from utils.preprocessing import get_args, get_unique_langs
 set_seed()
 
 
-def main():
-    parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
-    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
-    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction)
-    parser.add_argument("--extended-dataset", help= "Run experiments on English and Chinese dataset", action=argparse.BooleanOptionalAction)
-    parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
-    parser.add_argument("--only-english", help= "Run experiments only on English dataset", type= int, default=0)
-    parser.add_argument("--only-chinese", help= "Run experiments only on Chinese dataset", type= int, default=0)
-    parser.add_argument("--eval-lang", help= "Specify languages to evaluate results on",  action='store',type=str, nargs="+")
-    args = parser.parse_args()
-
-    parent_dir = "all_passages/lang_token" if args.lang_token else "all_passages"
+def main(**kwargs):
+    langs = get_unique_langs(kwargs["eval_lang"])
+    parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
+    # TODO add new translations
     with open(f'{parent_dir}/id_to_passage.json', encoding="utf-8") as f:
         id_to_passage = json.load(f)
     eval_dataset = []
-    with open(f'{args.cache_dir}/rerank_output.jsonl', encoding="utf-8") as f:
+    with open(f'{kwargs["cache_dir"]}/rerank_output.jsonl', encoding="utf-8-sig") as f:
         for line in f.readlines():
-            # print(line)
+            # 
             sample = json.loads(line)
-            if sample["lang"] not in args.eval_lang:
+            if sample["lang"] not in langs:
                 continue
             eval_dataset.append({
                 'query': sample['input'],
@@ -39,23 +32,24 @@ def main():
                 'lang': sample["lang"]
             })
             
-    cache_path = f'{args.cache_dir}/DAMO_ConvAI/nlp_convai_generation_pretrain'
+    cache_path = f'{kwargs["cache_dir"]}/DAMO_ConvAI/nlp_convai_generation_pretrain'
     trainer = DocumentGroundedDialogGenerateTrainer(
         model=cache_path,
         train_dataset=None,
         eval_dataset=eval_dataset,
-        lang_token=args.lang_token,
-        eval_lang=args.eval_lang
+        lang_token=kwargs["lang_token"],
+        eval_lang=kwargs["eval_lang"]
     )
 
     evaluate(trainer, checkpoint_path=os.path.join(trainer.model.model_dir,
-                                                f'finetuned_model.bin'), eval_lang=[args.eval_lang])
-    fname= f"{'_'.join(args.eval_lang)}_evaluate_result.json"
+                                                f'finetuned_model.bin'), eval_lang=kwargs["eval_lang"])
+    eval_langs = "_".join(langs)  
+    fname= f"{eval_langs}_evaluate_result.json"
     with open(f'{cache_path}/{fname}') as f:
         predictions = json.load(f)['outputs']
 
-    eval_langs = "_".join(args.eval_lang)    
-    with open(f'{args.cache_dir}/outputStandardFileBaseline_{eval_langs}.json', 'w') as f:
+      
+    with open(f'{kwargs["cache_dir"]}/outputStandardFileBaseline_{eval_langs}.json', 'w') as f:
         for query, prediction in zip(eval_dataset, predictions):
             f.write(json.dumps({
                 'query': query['query'],
@@ -66,4 +60,5 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    kwargs = get_args()
+    main(**kwargs)

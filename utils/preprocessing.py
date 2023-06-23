@@ -4,17 +4,18 @@ from modelscope.utils.logger import get_logger
 from sklearn.model_selection import train_test_split
 from collections import defaultdict
 import pandas as pd
-from torch import nn 
 from typing import Union
 import json
 import os 
 from ast import literal_eval
+import argparse
+from itertools import chain
 
 
 logger = get_logger()
 
 LANG_TOKENS = {"fr": "<fr>",
-               "vn": "<vn>",
+               "vi": "<vi>",
                "en": "<en>",
                "cn": "<cn>"}
 
@@ -71,15 +72,76 @@ def add_lang_token(dataset:Union[pd.DataFrame, list], lang_key:str, colnames:lis
 
     logger.info(f"adding special language token {lang_key} to input query...")
             
-    dataset[token_colname] = LANG_TOKENS_DD[lang_key]
+    # dataset[token_colname] = LANG_TOKENS_DD[lang_key]
     dataset[colnames] = dataset[colnames].apply(lambda x: concat_special_token(x))
 
     return dataset
 
 
-def save_to_json(df:pd.DataFrame, export_cols:list, fname:str="dev.json", dir:str=""):
-    dir = os.path.join(dir, fname)
-
-    logger.info(f"save test set {fname}...")
-    df[export_cols].to_json(fname, orient="records", lines=True)
+def save_to_json(df:pd.DataFrame, export_cols:list, fname:str="dev.json", pdir:str=""):
+    os.makedirs(pdir, exist_ok=True)
+    logger.info(f"save test set: {pdir}/{fname}...")
+    df[export_cols].to_json(f"{pdir}/{fname}", orient="records", lines=True, force_ascii=False)
     logger.info("DONE...")
+
+
+def get_args():
+    parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
+    parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
+    parser.add_argument("---extended-rerank-dataset-fname", help= "Specifiy cache dir to save model to", type= str, default= "extended_rerank_dataset.json")
+    parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
+    parser.add_argument("--eval-lang", help= "Specify list of languages to train models on, e.g., [['fr', 'vi'], ['fr'], ['vi']]", type=eval)
+    parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--only-inference", help= "Only run inference scripts", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--only-train", help= "Only run training scripts", action=argparse.BooleanOptionalAction, default=None)
+    parser.add_argument("--test-size", help= "Set test split", type= float, default= 0.1)
+    parser.add_argument("--batch-accumulation", help= "Use batch accumulation to maintain baseline results", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--gradient-accumulation-steps", help= "Specifiy cache dir to save model to", type= int, default= 1)
+    parser.add_argument("--num-devices", help= "Specifiy number of devices available", type= int, default= 1)
+    parser.add_argument("--batch-size", help= "Specifiy batch size", type= int, default= 128)
+    parser.add_argument("--per-gpu-batch-size", help= "Specifiy batch size", type= int, default= 64)
+    parser.add_argument("--retrieval-step", help= "Initiate translation for retrieval step", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--rerank-step", help= "Initiate translation for rerank step", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--generation-step", help= "Initiate translation for generation step", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--target-langs", help= "Specify target languages, e.g. ['fr', 'vi']", type=eval) 
+    parser.add_argument("--source-lang", help= "Specify source languages", type=str, default='en') 
+    parser.add_argument("--save-output", help= "Save output of current pipeline step", type=int, default=0) 
+    parser.add_argument("--translate-mode", help= "Specify source languages", type=str, default="") 
+
+    args, _ = parser.parse_known_args()
+
+    return vars(args)
+
+
+def get_unique_langs(arr):
+    seen = set()
+    unique_flat_list = list(chain.from_iterable(sublist for sublist in arr if not any(item in seen or seen.add(item) for item in sublist)))
+    return unique_flat_list
+
+
+def add_translation2trainset(train_df:pd.DataFrame, lang:str, pipeline_step:str, dir:str):
+    logger.info(f"add translated datapoints to train dataset...")
+
+    translated_df = pd.read_json(f"{dir}/ttrain_{pipeline_step}_{lang}.json", lines=True, encoding="utf-8-sig")
+    if pipeline_step == "generation":
+        translated_df = translated_df.rename({"passages": "rerank"},  axis='columns')
+    translated_df["lang"] = lang 
+    print(f"example of translated datapoints: {translated_df.head(2)}")
+
+    new_train_dataset = pd.concat([train_df, translated_df])
+    new_train_dataset = new_train_dataset.reset_index(drop=True)
+
+    print(f"successfully added {len(new_train_dataset) - len(train_df)} new datapoints to train dataset...")
+
+    return new_train_dataset
+
+
+def get_unique_passages(df:pd.DataFrame, lang:str=None):
+    passages = df['passages'].dropna()
+    unique_passages  = list(set(chain.from_iterable(passages)))
+
+    if lang is not None:
+        unique_passages = [f"{LANG_TOKENS_DD[lang]} {p}" for p in unique_passages]
+    
+    return unique_passages 
+
