@@ -142,6 +142,6 @@ def get_unique_passages(df:pd.DataFrame, lang:str=None):
 
     if lang is not None:
         unique_passages = [f"{LANG_TOKENS_DD[lang]} {p}" for p in unique_passages]
-    
+        
     return unique_passages 
 

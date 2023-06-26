@@ -151,7 +151,7 @@ def main(**kwargs):
     )
     logger = logging.getLogger()
 
-    logging.info(f"enter translate-{kwargs['translate_mode']} mode on {device=}...")
+    logger.info(f"enter translate-{kwargs['translate_mode']} mode on {device=}...")
     train_dataset = get_dataset(**kwargs)
 
     if train_dataset is None: # translate dataset already exists
@@ -183,16 +183,19 @@ def main(**kwargs):
                 parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
 
                 with open(f'{parent_dir}/{kwargs["source_lang"]}.json') as f:
-                    all_passages = json.load(f)
-                    translated_passages = translate_passages(passage_col=pd.Series([], name='passages'), all_passages=all_passages, target_lang=target_lang, **kwargs)
+                    lang_passages = json.load(f)
+                    translated_passages = translate_passages(passage_col=pd.Series([], name='passages'), all_passages=lang_passages, target_lang=target_lang, **kwargs)
                     translated_passages = translated_passages.to_dict(orient='records')
 
                     print(f"{translate_passages=}")
 
                     json_data = json.dumps(translated_passages, ensure_ascii=False)
                     # Save JSON-formatted string to a file
-                    with open(f"{parent_dir}/{kwargs['source_lang']}2{target_lang}.json", 'w', encoding='utf-8-sig') as f:
+                    fpath = f"{parent_dir}/{kwargs['source_lang']}2{target_lang}.json"
+                    with open(fpath, 'w', encoding='utf-8-sig') as f:
+                        logger.info(f"save translated {kwargs['source_lang']} passages to {fpath}...")
                         f.write(json_data)
+                        logger.info(f"DONE.")
 
             retrieval_translated_df["lang"] = target_lang
 

@@ -113,7 +113,7 @@ def main(**kwargs):
 
     trainer.train(
         batch_size=128,
-        total_epoches=1,
+        total_epoches=10,
         accumulation_steps=kwargs["gradient_accumulation_steps"],
         loss_log_freq=1
         # per_gpu_batch_size=args.per_gpu_batch_size,
