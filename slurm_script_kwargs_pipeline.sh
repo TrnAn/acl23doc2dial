@@ -12,7 +12,8 @@ translate_train=0
 cache_dir=.
 translate_mode=""
 target_langs="["fr", "vi"]"
-source_lang=en
+source_langs="["en"]"
+
 while [ $# -gt 0 ]; do
     if [[ $1 == "--"* ]]; then
         v="${1/--/}"
@@ -52,9 +53,9 @@ export SEED_VALUE=$seed &&\
 
 if [[ $lang_token -eq 1 ]]
 then
-    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --target-langs "$target_langs" --source-lang $source_lang --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode $translate_mode --lang-token
+    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode $translate_mode --lang-token
 else
-    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --target-langs "$target_langs" --source-lang $source_lang --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode $translate_mode
+    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode $translate_mode
 fi
 popd
 exit 0
