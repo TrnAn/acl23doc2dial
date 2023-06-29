@@ -6,7 +6,7 @@ import inference_retrieval
 import inference_rerank
 import inference_generation
 
-import translate
+import translate_train, translate_test
 from tqdm import tqdm
 from utils.preprocessing import get_args
 import re
@@ -52,7 +52,7 @@ if __name__ == '__main__':
                 step_name = re.search(r"train_(.*)", name).group(1)
                 tmp = kwargs.copy()
                 tmp[f"{step_name}_step"] = True
-                translate.main(**tmp)
+                translate_train.main(**tmp)
                 logger.info(f"finished translate-train...")
 
             logging.info(f"start {name} step...")
@@ -62,7 +62,7 @@ if __name__ == '__main__':
 
     # start infererence pipeline
     if not kwargs['only_train']:
-        unique_langs = set(item for sublist in kwargs["eval_lang"] for item in sublist)
+        # unique_langs = set(item for sublist in kwargs["source_lang"] for item in sublist)
 
         logger.info("START INFERENCE...")
 
@@ -75,10 +75,10 @@ if __name__ == '__main__':
                 tmp["eval_lang"]    = [lang]
 
                 if kwargs["translate_mode"] == "test":
-                    for source_lang in unique_langs:
-                        tmp["source_lang"] = source_lang
-                        tmp["target_langs"] = ['en']
-                        translate.main(**tmp)
+                    step_name = re.search(r"inference_(.*)", name).group(1)
+                    tmp[f"{step_name}_step"] = True
+                    print("is test")
+                    translate_test.main(**tmp)
 
                 inference_step.main(**tmp)
 
