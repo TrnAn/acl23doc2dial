@@ -98,6 +98,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
         self.train_dataset  = kwargs['train_dataset']
         self.eval_dataset   = kwargs['eval_dataset']
         self.all_passages   = kwargs['all_passages']
+        self.eval_passages  = kwargs["eval_passages"]
         self.save_output    = kwargs['save_output']
 
     def train(self,
@@ -197,8 +198,8 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
         with torch.no_grad():
             all_ctx_vector = []
             for mini_batch in tqdm.tqdm(
-                    range(0, len(self.all_passages), per_gpu_batch_size)):
-                context = self.all_passages[mini_batch:mini_batch
+                    range(0, len(self.eval_passages), per_gpu_batch_size)):
+                context = self.eval_passages[mini_batch:mini_batch
                                             + per_gpu_batch_size]
                 processed = \
                     self.preprocessor({'context': context},
@@ -239,7 +240,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                         processed).detach().cpu().numpy().astype('float32')
                     D, Index = faiss_index.search(query_vector, 20)
                     results['outputs'] += [[
-                        self.all_passages[x] for x in retrieved_ids
+                        self.eval_passages[x] for x in retrieved_ids
                     ] for retrieved_ids in Index.tolist()]
                     results['targets'] += positive
 

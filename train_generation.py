@@ -180,7 +180,8 @@ def train(trainer,
           weight_decay=0.1,
           eps=1e-06,
           loss_log_freq=40,
-          clip_grad_norm=1.0):
+          clip_grad_norm=1.0,
+          is_translate_test=False):
     model = trainer.model.model.generator.generator
     tokenizer = trainer.preprocessor.generation_tokenizer
     device = trainer.preprocessor.device
@@ -204,7 +205,7 @@ def train(trainer,
         losses = []
         for index, payload in enumerate(tqdm.tqdm(train_loader)):
             query, context, label,_ = payload
- 
+
             query = [
                 tokenizer.decode(
                     tokenizer([x], add_special_tokens=False, return_tensors='pt')['input_ids'][0][:128])
@@ -251,8 +252,16 @@ def train(trainer,
             best_score = total_score
             model_path = os.path.join(trainer.model.model_dir,
                                       'finetuned_model.bin')
+            
             state_dict = trainer.model.model.state_dict()
             torch.save(state_dict, model_path)
+            if is_translate_test:
+                trainer.model.model.generator.rag.generator.config.save_pretrained(os.path.join(trainer.model.model_dir, "generation"))
+                trainer.model.model.rerank.encoder.roberta.config.save_pretrained(os.path.join(trainer.model.model_dir,"rerank"))
+
+            # torch.save(state_dict, os.path.join(trainer.model.model_dir,
+            #                               'pytorch_model.bin'))
+
             logger.info(
                 'epoch %d obtain max score: %.4f, saving model to %s' %
                 (epoch, total_score, model_path))
@@ -325,7 +334,8 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
 def main(**kwargs):
 
     train_dataset_fr, train_dataset_vi, train_dataset_en, train_dataset_cn = None, None, None, None
-    langs = set(item for sublist in kwargs["eval_lang"] for item in sublist)
+    langs = set(item for sublist in kwargs["eval_lang"] for item in sublist) 
+    print(f"{langs=}")
     if "en" in langs:
         train_dataset_en = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
         train_dataset_en["lang"] = "en"
@@ -409,9 +419,10 @@ def main(**kwargs):
     dev_dataset     = pd.concat(dev_dataset)
 
     if not kwargs["lang_token"]:
-        train_dataset["rerank"]  = train_dataset.rerank.apply(literal_eval)
-        dev_dataset["rerank"]    = dev_dataset.rerank.apply(literal_eval)
+        train_dataset["rerank"]  = train_dataset.rerank.apply(eval)
+        dev_dataset["rerank"]    = dev_dataset.rerank.apply(eval)
 
+    print(train_dataset["rerank"].head(2))
     # truncate passages
     # if len(langs - set(["fr", "vi"])) > 1:
     #     df_wo_cn    = train_df.head(len(train_df) - len(train_dataset_cn))
@@ -428,17 +439,17 @@ def main(**kwargs):
         freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
         exploration.plot_freq(freq_df, plot_dir=kwargs["cache_dir"])
 
-    parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
+    # parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
     # with open(f'{parent_dir}/id_to_passage.json') as f:
     #     id_to_passage = json.load(f)
-
-    print(f"{kwargs['lang_token']=}")
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir=kwargs["cache_dir"])
     trainer = DocumentGroundedDialogGenerateTrainer(
         model           =   cache_path,
-        train_dataset   =   train_dataset.to_dict('records'), # train_dataset,
-        eval_dataset    =   dev_dataset.to_dict('records'), # train_dataset[:100],
-        lang_token      =   kwargs["lang_token"]
+        train_dataset   =   train_dataset.to_dict('records'),
+        eval_dataset    =   dev_dataset.to_dict('records'),
+        lang_token      =   kwargs["lang_token"],
+        translate_mode  =   kwargs["translate_mode"],
+        is_inference    =   kwargs["is_inference"]
     )
 
     # use batch accumulation
@@ -447,7 +458,7 @@ def main(**kwargs):
 
     print(f"BATCH SIZE: {kwargs['per_gpu_batch_size']}")
 
-    train(trainer, eval_lang=kwargs["eval_lang"], batch_size=kwargs["per_gpu_batch_size"], accumulation_steps=kwargs["gradient_accumulation_steps"], total_epoches=10, learning_rate=1e-4, loss_log_freq=1)
+    train(trainer, eval_lang=kwargs["eval_lang"], batch_size=kwargs["per_gpu_batch_size"], accumulation_steps=kwargs["gradient_accumulation_steps"], total_epoches=10, learning_rate=1e-4, loss_log_freq=1, is_translate_test=True if kwargs["translate_mode"]=="test" else False)
     evaluate(trainer, eval_lang=kwargs["eval_lang"], checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 

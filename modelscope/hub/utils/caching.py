@@ -134,6 +134,8 @@ class ModelFileSystemCache(FileSystemCache):
         else:
             super().__init__(os.path.join(cache_root, owner, name))
             self.model_meta = {MODEL_META_MODEL_ID: '%s/%s' % (owner, name)}
+            # self.put_file({'Path': os.path.join(cache_root, owner, name), 'Revision': '1.0.0'}, os.path.join(cache_root, "temp"))
+            # self.cached_files.append({'Path': os.path.join(cache_root, owner, name), 'Revision': '1.0.0'})
             self.save_model_meta()
 
     def load_model_meta(self):

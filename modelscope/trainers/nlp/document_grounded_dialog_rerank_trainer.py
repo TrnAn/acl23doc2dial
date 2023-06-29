@@ -47,7 +47,7 @@ def measure_result(result_dict):
     module_name=Trainers.document_grounded_dialog_rerank_trainer)
 class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
 
-    def __init__(self, model, train_dataset, dev_dataset, **args):
+    def __init__(self, model, train_dataset, eval_dataset, **args):
         args = args['args']
         set_seed(args['seed'])
         self.positive_pids = ''
@@ -56,8 +56,8 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         self.inst_id2pos_pids = dict()
         self.inst_id2pos_passages = dict()
         self.train_dataset = train_dataset
-        self.dev_dataset = dev_dataset
-        print(f"{model=}")
+        self.dev_dataset = eval_dataset
+        print(model)
         self.model = Model.from_pretrained(model, revision='v1.0.0', cache_dir=args["cache_dir"])
         summary(self.model)
         self.preprocessor = DocumentGroundedDialogRerankPreprocessor(

@@ -162,8 +162,8 @@ def main(**kwargs):
 
     trainer = DocumentGroundedDialogRerankTrainer(
         model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 
-        train_dataset=train_dataset.to_dict('records'), 
-        dev_dataset=dev_dataset.to_dict('records'), 
+        train_dataset   = train_dataset.to_dict('records'),
+        eval_dataset    = dev_dataset.to_dict('records'),
         args=kwargs
         )
     

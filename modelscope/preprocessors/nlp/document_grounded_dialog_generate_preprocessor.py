@@ -3,7 +3,7 @@ import os
 from typing import Any, Dict
 
 import torch
-from transformers import MT5Tokenizer, XLMRobertaTokenizer
+from transformers import MT5Tokenizer, XLMRobertaTokenizer, T5Tokenizer
 
 from modelscope.metainfo import Preprocessors
 from modelscope.preprocessors import Preprocessor
@@ -40,7 +40,15 @@ class DocumentGroundedDialogGeneratePreprocessor(Preprocessor):
         self.target_sequence_length = self.config['target_sequence_length']
         self.rerank_tokenizer = XLMRobertaTokenizer.from_pretrained(
             os.path.join(self.model_dir, 'rerank'))
-        self.generation_tokenizer = MT5Tokenizer.from_pretrained(
+
+        if kwargs["translate_mode"] == "test":
+            self.generation_tokenizer = T5Tokenizer.from_pretrained("t5-small")
+            special_tokens = {"eos_token": "</s>", "unk_token": "<unk>", "pad_token": "<pad>"}
+            self.generation_tokenizer.add_special_tokens(special_tokens)
+            additional_tokens = ["<last_turn>", "<user>", "<agent>", "<response>", "<passage>"]
+            self.generation_tokenizer.add_tokens(additional_tokens)
+        else:
+            self.generation_tokenizer = MT5Tokenizer.from_pretrained(
             os.path.join(self.model_dir, 'generation'))
 
          # add special language tokens <lang> to tokenizer

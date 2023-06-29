@@ -104,9 +104,10 @@ def get_args():
     parser.add_argument("--rerank-step", help= "Initiate translation for rerank step", action=argparse.BooleanOptionalAction)
     parser.add_argument("--generation-step", help= "Initiate translation for generation step", action=argparse.BooleanOptionalAction)
     parser.add_argument("--target-langs", help= "Specify target languages, e.g. ['fr', 'vi']", type=eval) 
-    parser.add_argument("--source-lang", help= "Specify source languages", type=str, default='en') 
+    parser.add_argument("--source-langs", help= "Specify source languages, i.e., ['en']", type=eval) 
     parser.add_argument("--save-output", help= "Save output of current pipeline step", type=int, default=0) 
     parser.add_argument("--translate-mode", help= "Specify source languages", type=str, default="") 
+    parser.add_argument("--is-inference", help= "is inference pipeline step", action=argparse.BooleanOptionalAction)
 
     args, _ = parser.parse_known_args()
 
@@ -125,6 +126,9 @@ def add_translation2trainset(train_df:pd.DataFrame, lang:str, pipeline_step:str,
     translated_df = pd.read_json(f"{dir}/ttrain_{pipeline_step}_{lang}.json", lines=True, encoding="utf-8-sig")
     if pipeline_step == "generation":
         translated_df = translated_df.rename({"passages": "rerank"},  axis='columns')
+        # translated_df["rerank"] = translated_df["rerank"].fillna("[]")
+        # translated_df["query"] = translated_df["query"].fillna("")
+        translated_df = translated_df.dropna(subset=['query'])
     translated_df["lang"] = lang 
     print(f"example of translated datapoints: {translated_df.head(2)}")
 
@@ -137,9 +141,9 @@ def add_translation2trainset(train_df:pd.DataFrame, lang:str, pipeline_step:str,
 
 
 def get_unique_passages(df:pd.DataFrame, lang:str=None):
-    passages = df['passages'].dropna()
-    unique_passages  = list(set(chain.from_iterable(passages)))
-
+    # new_passages = df['passages'].dropna()
+    # unique_passages = new_passages.apply(eval).explode().tolist() #list(set(chain.from_iterable(passages)))
+    unique_passages = df["positive"].tolist() + df["negative"].tolist()
     if lang is not None:
         unique_passages = [f"{LANG_TOKENS_DD[lang]} {p}" for p in unique_passages]
         

@@ -12,7 +12,7 @@ set_seed()
 
 def main(**kwargs):
     fr_train_dataset, vi_train_dataset, en_train_dataset, cn_train_dataset = None, None, None, None
-    langs = set(item for sublist in kwargs["eval_lang"] for item in sublist)
+    langs = set(kwargs["source_langs"] + kwargs["target_langs"]) if kwargs["translate_mode"] == "test" else set(item for sublist in kwargs["eval_lang"] for item in sublist) 
 
     if "fr" in langs:
         fr_train_dataset = preprocessing.read('DAMO_ConvAI/FrDoc2BotRetrieval')
@@ -75,6 +75,9 @@ def main(**kwargs):
     }
 
     train_dataset, dev_dataset = [], []
+    if kwargs["translate_mode"] == "test":
+        langs = set(kwargs["target_langs"])
+
     for lang in langs:
         train, dev = lang_dd[lang]
         train_dataset.append(train)
@@ -83,29 +86,42 @@ def main(**kwargs):
     train_dataset   = pd.concat(train_dataset) 
     dev_dataset     = pd.concat(dev_dataset)
 
-    preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
+    if kwargs["translate_mode"] == "test":
+        save_dev_dataset = []
+        for lang in kwargs["source_langs"] + kwargs["target_langs"]:
+            print(lang)
+            _, dev = lang_dd[lang]
+            save_dev_dataset.append(dev)
+        save_dev_dataset = pd.concat(save_dev_dataset)
+    else:
+        save_dev_dataset = dev_dataset
+
+    print(f"{save_dev_dataset=}")
+    preprocessing.save_to_json(save_dev_dataset, save_dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
 
     parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
     all_passages = []
+    translated_passages = []
     for file_name in langs:
         with open(f'{parent_dir}/{file_name}.json') as f:
             all_passages += json.load(f)
 
             if kwargs["translate_mode"] == "train":
-                unique_passages = get_unique_passages(locals()[f"train_dataset_{lang}"], lang=lang) if kwargs["lang_token"] else get_unique_passages(locals()[f"train_dataset_{lang}"])
-                all_passages =  list(set(all_passages) | set(unique_passages))
+                translated_passages += get_unique_passages(locals()[f"train_dataset_{lang}"], lang=lang) if kwargs["lang_token"] else get_unique_passages(locals()[f"train_dataset_{lang}"])
+                
+    all_passages_w_translations =  list(set(all_passages) | set(translated_passages))
 
-
-    if kwargs["batch_accumulation"]:
-        kwargs["gradient_accumulation_steps"] = kwargs["batch_size"] // (kwargs["num_devices"] * kwargs["per_gpu_batch_size"])
-
-    print(f"BATCH SIZE: {kwargs['per_gpu_batch_size']}")
+    # if kwargs["batch_accumulation"]:
+    #     kwargs["gradient_accumulation_steps"] = kwargs["batch_size"] // (kwargs["num_devices"] * kwargs["per_gpu_batch_size"])
+    # print(f"BATCH SIZE: {kwargs['per_gpu_batch_size']}")
+    
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=kwargs["cache_dir"])
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
-        train_dataset=train_dataset.to_dict('records'),
-        eval_dataset=dev_dataset.to_dict('records'),
-        all_passages=all_passages,
+        train_dataset   = train_dataset.to_dict('records'),
+        eval_dataset    = dev_dataset.to_dict('records'),
+        all_passages=all_passages_w_translations,
+        eval_passages=all_passages,
         lang_token  = kwargs["lang_token"],
         eval_lang   = kwargs["eval_lang"],
         save_output = kwargs["save_output"]

@@ -75,6 +75,7 @@ def main(**kwargs):
 
     
     langs = get_unique_langs(kwargs["eval_lang"])
+    print(f"{langs=}")
     kwargs["eval_lang"] = kwargs["eval_lang"][0]
 
     model = Model.from_pretrained(model_dir, **kwargs)
@@ -106,12 +107,21 @@ def main(**kwargs):
     parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
 
     # replace native lang wth translations vi -> vi2en; fr -> fr2en
-    for file_name in ["fr", "vi", "en"]:
+    for file_name in kwargs["source_langs"] + kwargs["target_langs"]:
         with open(f'./{parent_dir}/{file_name}.json', encoding="utf-8-sig") as f:
             all_passages = json.load(f)
             for every_passage in all_passages:
                 ptr += 1
                 passage_to_id[every_passage.strip()] = str(ptr)
+
+
+    if kwargs["translate_mode"] == "test":
+         for src_lang in kwargs["source_langs"]:
+            with open(f'{kwargs["cache_dir"]}/{parent_dir}/{src_lang}2{kwargs["target_langs"][0]}.json', encoding="utf-8-sig") as f:
+                all_passages = json.load(f)
+                for every_passage in all_passages:
+                    ptr += 1
+                    passage_to_id[every_passage.strip()] = str(ptr)
 
     # translate evaluate_result
     with open(f'{kwargs["cache_dir"]}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/evaluate_result.json', encoding="utf-8-sig") as file_in:

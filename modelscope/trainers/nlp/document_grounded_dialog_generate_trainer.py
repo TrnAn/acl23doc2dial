@@ -11,8 +11,7 @@ import tqdm
 from rouge import Rouge
 from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
-from transformers import AdamW, get_scheduler
-
+from transformers import AdamW, get_scheduler, T5ForConditionalGeneration
 from modelscope.metainfo import Trainers
 from modelscope.models import Model
 from modelscope.preprocessors import DocumentGroundedDialogGeneratePreprocessor
@@ -163,14 +162,24 @@ def measure_result(result_dict):
 class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
 
     def __init__(self, model: str, revision='v1.0.0', *args, **kwargs):
+
         self.model = Model.from_pretrained(model, revision=revision)
-        print(summary(self.model.model))
+
+        # SWAP MT5MODEL WITH T5MODEL
+        if kwargs["translate_mode"] == "test": # and not kwargs["is_inference"]
+            logger.info("replace MT5ForConditionalGeneration with T5ForConditionalGeneration...")
+            generator = T5ForConditionalGeneration.from_pretrained("t5-small")
+            self.model.model.generator.rag.generator = generator
+
+        # print(.model.model.generator.generator)    
+        summary(self.model.model)
+
         self.preprocessor = DocumentGroundedDialogGeneratePreprocessor(
-            model_dir=self.model.model_dir, lang_token=kwargs["lang_token"])
+            model_dir=self.model.model_dir, lang_token=kwargs["lang_token"], translate_mode=kwargs["translate_mode"])
         self.device = self.preprocessor.device
 
-        if kwargs["lang_token"] is not None:
-            self.model.model.rerank.encoder.resize_token_embeddings(self.preprocessor.token_length)
+        # if kwargs["lang_token"] is not None:
+        self.model.model.rerank.encoder.resize_token_embeddings(self.preprocessor.token_length)
 
         self.model.model.to(self.device)
         self.train_dataset = kwargs['train_dataset']
@@ -241,6 +250,8 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
                     f'epoch: {epoch} \t batch: last \t loss: {sum(losses) / len(losses)}'
                 )
 
+            print("save best model")
+            print(f"tessst: {self.model.model.generator.rag.generator.config=}")
             meters = self.evaluate(batch_size=batch_size)
             total_score = sum([x for x in meters.values()])
             if total_score >= best_score:
@@ -249,9 +260,17 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
                                           'finetuned_model.bin')
                 state_dict = self.model.model.state_dict()
                 torch.save(state_dict, model_path)
+                torch.save(state_dict, os.path.join(self.model.model_dir,
+                                          'pytorch_model.bin'))
+                
+                # save rerank + generation model config
+                self.model.model.generator.rag.generator.config.save_pretrained(os.path.join(self.model.model_dir,"generation/"))
+                self.model.model.rerank.encoder.roberta.config.save_pretrained(os.path.join(self.model.model_dir,"rerank/"))
+
                 logger.info(
-                    'epoch %d obtain max score: %.4f, saving model to %s' %
+                    'the epoch %d obtain max score: %.4f, saving model to %s' %
                     (epoch, total_score, model_path))
+
 
     def evaluate(self, batch_size=16, checkpoint_path=None):
         """
