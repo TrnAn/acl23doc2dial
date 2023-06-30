@@ -171,7 +171,7 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
             generator = T5ForConditionalGeneration.from_pretrained("t5-small")
             self.model.model.generator.rag.generator = generator
 
-        # print(.model.model.generator.generator)    
+        print(self.model.model.generator.generator)    
         summary(self.model.model)
 
         self.preprocessor = DocumentGroundedDialogGeneratePreprocessor(

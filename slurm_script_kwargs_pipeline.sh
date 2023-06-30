@@ -53,9 +53,9 @@ export SEED_VALUE=$seed &&\
 
 if [[ $lang_token -eq 1 ]]
 then
-    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode $translate_mode --lang-token
+    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode "$translate_mode" --lang-token
 else
-    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode $translate_mode
+    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode "$translate_mode"
 fi
 popd
 exit 0

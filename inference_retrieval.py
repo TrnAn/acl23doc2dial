@@ -39,8 +39,8 @@ def main(**kwargs):
     #         all_passages += json.load(f)
     parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
 
-    if kwargs["translate_mode"] == "test":
-        langs += [f"{src_lang}2{kwargs['target_langs'][0]}" for src_lang in kwargs["source_langs"]]
+    # if kwargs["translate_mode"] == "test":
+    #     langs += [f"{src_lang}2{kwargs['target_langs'][0]}" for src_lang in kwargs["source_langs"]]
 
     all_passages = []
     translated_passages = []

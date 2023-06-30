@@ -127,21 +127,22 @@ def main(**kwargs):
         save_output = kwargs["save_output"]
     )
 
-    trainer.train(
-        batch_size=128,
-        total_epoches=10,
-        accumulation_steps=kwargs["gradient_accumulation_steps"],
-        loss_log_freq=1
-        # per_gpu_batch_size=args.per_gpu_batch_size,
-    )
+    # trainer.train(
+    #     batch_size=128,
+    #     total_epoches=10,
+    #     accumulation_steps=kwargs["gradient_accumulation_steps"],
+    #     loss_log_freq=1
+    #     # per_gpu_batch_size=args.per_gpu_batch_size,
+    # )
     trainer.evaluate(
         checkpoint_path=os.path.join(trainer.model.model_dir,
                                     'finetuned_model.bin'))
     
+    # TODO add en-vi en-fr in case of translate-train
     extended_lang = langs - set(["fr", "vi"])
     if len(extended_lang) > 0:
         for lang_tag in extended_lang:
-            combined_df = pd.concat([train_dataset_en, dev_dataset_en]).reset_index()
+            combined_df = pd.concat([locals()[f"train_dataset_{lang}"], locals()[f"dev_dataset_{lang}"]]).reset_index()
             trainer.save_dataset(dataset=combined_df.to_dict('records'), fname=f"{lang_tag}_{kwargs['extended_rerank_dataset_fname']}")
 
 

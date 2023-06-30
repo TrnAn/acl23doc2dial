@@ -104,7 +104,7 @@ def main(**kwargs):
 
         # add machine translated en -> fr, vi queries to train set
     if kwargs["translate_mode"] == "train": 
-        pipeline_step= 'rerank'
+        pipeline_step = 'rerank'
         train_dataset_vi = add_translation2trainset(train_df=train_dataset_vi, lang='vi', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])
         train_dataset_fr = add_translation2trainset(train_df=train_dataset_fr, lang='fr', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])
         # ttrain_vi = pd.read_json(f"{kwargs['cache_dir']}/ttrain_rerank_vi.json", lines=True)
@@ -154,11 +154,11 @@ def main(**kwargs):
     train_dataset   = pd.concat(train_dataset) 
     dev_dataset     = pd.concat(dev_dataset)
     tmp_df = pd.concat([train_dataset, dev_dataset])
-    tmp_df = tmp_df.reset_index()
+    tmp_df = tmp_df.reset_index(drop=True)
     tmp_df["id"] = tmp_df.index.astype(str)
 
-    train_dataset = tmp_df[:len(train_dataset)]
-    dev_dataset = tmp_df[len(train_dataset):]
+    train_dataset   = tmp_df[:len(train_dataset)]
+    dev_dataset     = tmp_df[len(train_dataset):]
 
     trainer = DocumentGroundedDialogRerankTrainer(
         model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 

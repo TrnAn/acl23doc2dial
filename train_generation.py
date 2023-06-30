@@ -255,12 +255,9 @@ def train(trainer,
             
             state_dict = trainer.model.model.state_dict()
             torch.save(state_dict, model_path)
-            if is_translate_test:
-                trainer.model.model.generator.rag.generator.config.save_pretrained(os.path.join(trainer.model.model_dir, "generation"))
-                trainer.model.model.rerank.encoder.roberta.config.save_pretrained(os.path.join(trainer.model.model_dir,"rerank"))
-
-            # torch.save(state_dict, os.path.join(trainer.model.model_dir,
-            #                               'pytorch_model.bin'))
+            # if is_translate_test:
+            #     trainer.model.model.generator.rag.generator.config.save_pretrained(os.path.join(trainer.model.model_dir, "generation"))
+            #     trainer.model.model.rerank.encoder.roberta.config.save_pretrained(os.path.join(trainer.model.model_dir,"rerank"))
 
             logger.info(
                 'epoch %d obtain max score: %.4f, saving model to %s' %
