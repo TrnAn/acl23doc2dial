@@ -23,6 +23,7 @@ def main(**kwargs):
     if "en" in langs:
         en_train_dataset = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
         en_train_dataset["lang"] = "en"
+        print(f"{en_train_dataset.head(1)['response']}")
     if "cn" in langs:
         cn_train_dataset = pd.read_json("cn_train_dataset_in_domain.json", lines=True)
         cn_train_dataset["lang"] = "cn"
@@ -96,7 +97,6 @@ def main(**kwargs):
     else:
         save_dev_dataset = dev_dataset
 
-    print(f"{save_dev_dataset=}")
     preprocessing.save_to_json(save_dev_dataset, save_dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
 
     parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
@@ -127,13 +127,14 @@ def main(**kwargs):
         save_output = kwargs["save_output"]
     )
 
-    # trainer.train(
-    #     batch_size=128,
-    #     total_epoches=10,
-    #     accumulation_steps=kwargs["gradient_accumulation_steps"],
-    #     loss_log_freq=1
-    #     # per_gpu_batch_size=args.per_gpu_batch_size,
-    # )
+    trainer.train(
+        batch_size=128,
+        total_epoches=10,
+        accumulation_steps=kwargs["gradient_accumulation_steps"],
+        loss_log_freq=1
+        # per_gpu_batch_size=args.per_gpu_batch_size,
+    )
+    
     trainer.evaluate(
         checkpoint_path=os.path.join(trainer.model.model_dir,
                                     'finetuned_model.bin'))
@@ -142,7 +143,8 @@ def main(**kwargs):
     extended_lang = langs - set(["fr", "vi"])
     if len(extended_lang) > 0:
         for lang_tag in extended_lang:
-            combined_df = pd.concat([locals()[f"train_dataset_{lang}"], locals()[f"dev_dataset_{lang}"]]).reset_index()
+            combined_df = pd.concat([locals()[f"train_dataset_{lang_tag}"], locals()[f"dev_dataset_{lang_tag}"]]).reset_index()
+            print(f'{combined_df.head(1)["response"]}=')
             trainer.save_dataset(dataset=combined_df.to_dict('records'), fname=f"{lang_tag}_{kwargs['extended_rerank_dataset_fname']}")
 
 

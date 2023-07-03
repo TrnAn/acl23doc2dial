@@ -264,7 +264,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
 
     def save_dataset(self, dataset: Union[list, Dict[str, Any]],  per_gpu_batch_size=32, fname:str="rerank_dataset.json"):
         retrieval_results = []
-        self.guess = []
+
         with torch.no_grad():
             all_ctx_vector = []
             for mini_batch in tqdm.tqdm(
@@ -290,10 +290,11 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 default_value = []
                 tmp = dict.fromkeys(keys, default_value)
 
-                index = jobj["index"]
-                lang = jobj["lang"]
-                query = jobj["query"]
-                positive = jobj["positive"]
+                index       = jobj["index"]
+                lang        = jobj["lang"]
+                query       = jobj["query"]
+                positive    = jobj["positive"]
+                response    = jobj["response"]
          
                 processed       = self.preprocessor({'query': [query]}, invoke_mode=ModeKeys.INFERENCE)
                 query_vector    = self.model.encode_query(processed).detach().cpu().numpy().astype('float32')
@@ -309,6 +310,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 tmp["id"] = index
                 tmp["input"] = query
                 tmp["lang"] = lang
+                tmp["response"] = response
                 tmp["positive_pids"] = json.dumps([str(self.all_passages.index(positive))])
                 provenance = [{'wikipedia_id': str(retrieved_ids)}  for retrieved_ids in ranked_indices]
                 

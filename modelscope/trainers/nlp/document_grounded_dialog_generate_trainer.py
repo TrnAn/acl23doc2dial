@@ -168,10 +168,9 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
         # SWAP MT5MODEL WITH T5MODEL
         if kwargs["translate_mode"] == "test": # and not kwargs["is_inference"]
             logger.info("replace MT5ForConditionalGeneration with T5ForConditionalGeneration...")
-            generator = T5ForConditionalGeneration.from_pretrained("t5-small")
+            generator = T5ForConditionalGeneration.from_pretrained("t5-base")
             self.model.model.generator.rag.generator = generator
-
-        print(self.model.model.generator.generator)    
+  
         summary(self.model.model)
 
         self.preprocessor = DocumentGroundedDialogGeneratePreprocessor(

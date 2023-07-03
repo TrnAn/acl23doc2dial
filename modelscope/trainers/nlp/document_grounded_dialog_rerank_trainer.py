@@ -295,7 +295,68 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
                 all_meters["_".join(lang)] = meters
 
         return all_meters
+    
 
+    def save_dataset(self, dataset, fname:str="generation_dataset.json", top_k:int=5):
+        rerank_results = []
+        random.seed(42)
+        rand = random.Random()
+        
+        self.optimizer.model.eval()
+
+        with torch.no_grad():
+            # keys =  ["query", "rerank", "response"]
+            # default_value = []
+            # tmp = dict.fromkeys(keys, default_value)
+
+            shuffled_dataset = list(block_shuffle(dataset, block_size=100000, rand=rand))
+
+            for line_ndx, jobj in enumerate(shuffled_dataset):
+                tmp = {}
+                inst_id = str(jobj['id'])
+
+                if inst_id not in self.inst_id2pos_pids:
+                    continue
+
+                if line_ndx % self.args['world_size'] != \
+                        self.args['global_rank']:
+                    continue
+
+                query = jobj['input'] if 'input' in jobj else jobj['query']
+                passages = eval(jobj['passages'])
+                positive_pids = self.inst_id2pos_pids[inst_id]
+                if self.args['doc_match_weight'] > 0:
+                    positive_dids = [
+                        pid[:pid.index('::')] for pid in positive_pids
+                    ]
+                else:
+                    positive_dids = None
+                correctness = [
+                    self.passage_correctness(p['pid'], positive_pids,
+                                                positive_dids) for p in passages
+                ]
+                passages, correctness = self.limit_gpu_sequences(
+                    passages, correctness, rand)
+
+                logits = self.one_instance(query, passages) 
+            
+                score_passage_pairs = zip(logits, passages)
+                # curr_lang = re.match(r"<.*?>")
+                # score_passage_pairs = [ l, p in zip(logits, passages) if p.startswith(curr_lang)] # contraint on: same lang
+                sorted_pairs = sorted(score_passage_pairs, key=lambda x: x[0], reverse=True)
+                top_k_passages = [pair[1]['text'] for pair in sorted_pairs[:top_k]]
+ 
+                tmp['rerank']   = json.dumps(top_k_passages, ensure_ascii=False)   
+                tmp["query"]    = jobj['input'] if 'input' in jobj else jobj['query']
+                tmp["response"] = jobj['response']
+                
+                rerank_results.append(tmp)
+
+        # Save the list of dictionaries as JSON with ensure_ascii=False
+        path = os.path.join(self.model.model_dir, fname)
+        logger.info(f"saving dataset for rerank training to {path}...")
+        with open(path, "w") as json_file:
+            json.dump(rerank_results, json_file, ensure_ascii=False, indent=4)
 
 class Reporting:
 

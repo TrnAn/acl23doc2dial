@@ -140,7 +140,9 @@ def measure_result(result_dict):
     ]
 
     pattern = r"^<response>\s*|^<[^>]+>\s*"
-    hypothesis_list = [re.sub(pattern, '', x)  for x in hypothesis_list] #if len(x) > 10 else 'placeholder'
+    hypothesis_list = [
+        re.sub(pattern, '', x) if len(x) > 10 else 'placeholder' for x in hypothesis_list 
+        ]
     reference_list = [
         re.sub(pattern, '', x) for x in result_dict['targets']
     ] # .replace('<response>', '') 
@@ -191,7 +193,7 @@ def train(trainer,
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate,
-        num_workers=2,
+        # num_workers=2,
         pin_memory=True)
 
     optimizer = prepare_optimizer(trainer.model.model, learning_rate,
@@ -216,9 +218,11 @@ def train(trainer,
                 ' '.join([query[i], '<passage>', context[i][0]])
                 for i in range(len(query))
             ]
-
+            
+            # input_ids = tokenizer.batch_encode_plus(
+            #     list(generator_inputs), padding=True, return_tensors='pt').input_ids.to(device)            
             input_ids = tokenizer.batch_encode_plus(
-                list(generator_inputs), padding=True, return_tensors='pt').input_ids.to(device)
+                list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device)
             label_ids = tokenizer.batch_encode_plus(
                 list(label), padding=True, return_tensors='pt').input_ids.to(device)
 
@@ -276,6 +280,7 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
     trainer.model.model.eval()
     all_meters= {}
     for lang in eval_lang:
+        print(f"{lang=}")
         with torch.no_grad():
             valid_loader = DataLoader(
                 dataset=trainer.eval_dataset,
@@ -285,12 +290,15 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
             results = {'outputs': [], 'targets': []}
             for index, payload in enumerate(tqdm.tqdm(valid_loader)):
                 query, context, label, curr_lang = payload
+
                 if bool(set(curr_lang) & set(lang)) == 0:
+                    print(f"no in lang: {set(curr_lang)=}")
                     continue
-                query, context, label, curr_lang = zip(*[(q, p, n, l) for q, p, n, l in zip(query, context, label, curr_lang) if l in lang])
-                query = list(query)
+
+                query, context, label, curr_lang = zip(*[(q, p, n, l) for q, p, n, l in zip(query, context, label, curr_lang) if l in lang]) # filter datapoints with lang
+                query   = list(query)
                 context = list(context)
-                label = list(label)
+                label   = list(label)
                 curr_lang = list(curr_lang)
 
                 query = [
@@ -303,10 +311,21 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
                     for i in range(len(query))
                 ]
                 input_ids = tokenizer.batch_encode_plus(
-                    list(generator_inputs), padding=True, return_tensors='pt').input_ids.to(device)
+                    list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device) #padding=True
 
-                outputs = model.generate(input_ids, num_beams=3, max_length=128, early_stopping=True,
-                                        no_repeat_ngram_size=3)
+                # length_penalty=length_penalty,
+                # outputs = model.generate(input_ids, num_beams=3, max_length=128, early_stopping=True,
+                #                         no_repeat_ngram_size=3)
+                length_penalty=1.2
+                outputs = model.generate(
+                    input_ids, 
+                    num_beams=3, 
+                    max_length=128, 
+                    early_stopping=True,
+                    no_repeat_ngram_size=3, 
+                    length_penalty=length_penalty,
+                    # min_length=4
+                    ) 
                 predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False)
                 label = trainer.preprocessor.generation_tokenizer.batch_decode(
                     trainer.preprocessor.generation_tokenizer.batch_encode_plus(
@@ -324,25 +343,28 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
             with open(result_path, 'w') as f:
                 json.dump(results, f, ensure_ascii=False, indent=4)
             all_meters["_".join(lang)] = meters
-            print(f"{all_meters=}")
+
     return all_meters
 
 
 def main(**kwargs):
+    torch.cuda.empty_cache()
+    torch.backends.cuda.cudnn_enabled = True
 
     train_dataset_fr, train_dataset_vi, train_dataset_en, train_dataset_cn = None, None, None, None
     langs = set(item for sublist in kwargs["eval_lang"] for item in sublist) 
-    print(f"{langs=}")
+
     if "en" in langs:
-        train_dataset_en = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
+        # train_dataset_en = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
+        train_dataset_en = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_ranking_pretrain/en_{kwargs['extended_generation_dataset_fname']}")
         train_dataset_en["lang"] = "en"
-        train_dataset_en = train_dataset_en.rename({"passages": "rerank"},  axis='columns')
+        # train_dataset_en = train_dataset_en.rename({"passages": "rerank"},  axis='columns')
         # en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
   
     if "cn" in langs:
-        cn_train_dataset = pd.read_json("cn_train_dataset_in_domain.json", lines=True)
-        cn_train_dataset["lang"] = "cn"
-        cn_train_dataset = cn_train_dataset.rename({"passages": "rerank"},  axis='columns')
+        train_dataset_cn = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_ranking_pretrain/cn_{kwargs['extended_generation_dataset_fname']}")
+        train_dataset_cn["lang"] = "cn"
+        # train_dataset_cn = train_dataset_cn.rename({"passages": "rerank"},  axis='columns')
         # cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
         
     if "fr" in langs:
@@ -364,27 +386,6 @@ def main(**kwargs):
         pipeline_step= 'generation'
         train_dataset_vi = add_translation2trainset(train_df=train_dataset_vi, lang='vi', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])
         train_dataset_fr = add_translation2trainset(train_df=train_dataset_fr, lang='fr', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])
-        # ttrain_vi = pd.read_json(f"{kwargs['cache_dir']}/ttrain_generation_vi.json", lines=True)
-        # ttrain_vi = ttrain_vi.rename({"passages": "rerank"},  axis='columns')
-        # ttrain_vi["lang"] = "vi" 
-
-        # old_size = len(train_dataset_vi)
-        # train_dataset_vi = pd.concat([train_dataset_vi, ttrain_vi])
-        # train_dataset_vi = train_dataset_vi.reset_index(drop=True)
-        # new_size = len(train_dataset_vi)
-
-        # print(f"added {new_size - old_size} new datapoints to vi train dataset...")
-
-        # ttrain_fr = pd.read_json(f"{kwargs['cache_dir']}ttrain_generation_fr.json", lines=True)
-        # ttrain_fr = ttrain_fr.rename({"passages": "rerank"},  axis='columns')
-        # ttrain_fr["lang"] = "fr" 
-
-        # old_size = len(train_dataset_fr)
-        # train_dataset_fr = pd.concat([train_dataset_fr, ttrain_fr])
-        # train_dataset_fr = train_dataset_fr.reset_index(drop=True)
-        # new_size = len(train_dataset_fr)
-
-        # print(f"added {new_size - old_size} new datapoints to fr train dataset...")
 
 
     if kwargs["lang_token"]:
@@ -419,14 +420,7 @@ def main(**kwargs):
         train_dataset["rerank"]  = train_dataset.rerank.apply(eval)
         dev_dataset["rerank"]    = dev_dataset.rerank.apply(eval)
 
-    print(train_dataset["rerank"].head(2))
-    # truncate passages
-    # if len(langs - set(["fr", "vi"])) > 1:
-    #     df_wo_cn    = train_df.head(len(train_df) - len(train_dataset_cn))
-    #     # max_len     = len(max(sum(df_wo_cn["rerank"].tolist(), []), key=len))
-    #     max_len = max(len(string) for lst in df_wo_cn["rerank"] for string in lst)
-    #     train_df["rerank"]  = train_df.rerank.apply(lambda s: [x[:max_len] for x in s])
-    #     dev_df["rerank"]    = dev_df.rerank.apply(lambda s: [x[:max_len] for x in s])
+    print(train_dataset["rerank"].head(1))
 
     if kwargs["eval_input_file"] is None:
         raise Exception("Please specify arg --eval-input-file to read eval dataset from")
@@ -434,11 +428,9 @@ def main(**kwargs):
 
     if kwargs["lang_token"]:
         freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
-        exploration.plot_freq(freq_df, plot_dir=kwargs["cache_dir"])
+        exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot')
 
-    # parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
-    # with open(f'{parent_dir}/id_to_passage.json') as f:
-    #     id_to_passage = json.load(f)
+
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir=kwargs["cache_dir"])
     trainer = DocumentGroundedDialogGenerateTrainer(
         model           =   cache_path,
@@ -455,7 +447,8 @@ def main(**kwargs):
 
     print(f"BATCH SIZE: {kwargs['per_gpu_batch_size']}")
 
-    train(trainer, eval_lang=kwargs["eval_lang"], batch_size=kwargs["per_gpu_batch_size"], accumulation_steps=kwargs["gradient_accumulation_steps"], total_epoches=10, learning_rate=1e-4, loss_log_freq=1, is_translate_test=True if kwargs["translate_mode"]=="test" else False)
+    print(f"{kwargs['eval_lang']=}")
+    train(trainer, eval_lang=kwargs["eval_lang"], batch_size=kwargs["per_gpu_batch_size"], accumulation_steps=kwargs["gradient_accumulation_steps"], total_epoches=10, learning_rate=1e-4, loss_log_freq=1, is_translate_test=True if kwargs["translate_mode"] == "test" else False)
     evaluate(trainer, eval_lang=kwargs["eval_lang"], checkpoint_path=os.path.join(trainer.model.model_dir,
                                                    'finetuned_model.bin'))
 

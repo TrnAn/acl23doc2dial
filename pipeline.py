@@ -20,16 +20,6 @@ if __name__ == '__main__':
     if not os.path.exists(kwargs["cache_dir"]):
         os.makedirs(kwargs["cache_dir"])
 
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format='%(asctime)s - %(levelname)s - %(message)s',
-        handlers= [
-            logging.FileHandler(f'{kwargs["cache_dir"]}/pipeline.log'),  # File handler
-            logging.StreamHandler()  # Console handler
-        ]
-    )
-    logger = logging.getLogger()
-
     pipeline_steps = {
         "train" :       {
             "train_retrieval":      train_retrieval,
@@ -44,7 +34,7 @@ if __name__ == '__main__':
 
     # start training pipeline
     if not kwargs['only_inference']:
-        logger.info("START TRAINING...")
+        print("START TRAINING...")
 
         for name, train_step in pipeline_steps['train'].items():
             
@@ -53,21 +43,21 @@ if __name__ == '__main__':
                 tmp = kwargs.copy()
                 tmp[f"{step_name}_step"] = True
                 translate_train.main(**tmp)
-                logger.info(f"finished translate-train...")
+                print(f"finished translate-train...")
 
             logging.info(f"start {name} step...")
             train_step.main(**kwargs)
-            logger.info(f"finished training...")
+            print(f"finished training...")
 
 
     # start infererence pipeline
     if not kwargs['only_train']:
         # unique_langs = set(item for sublist in kwargs["source_lang"] for item in sublist)
 
-        logger.info("START INFERENCE...")
+        print("START INFERENCE...")
 
         for name, inference_step in tqdm(pipeline_steps['inference'].items()):
-            logger.info(f"start {name} step...")
+            print(f"start {name} step...")
                 
             for idx, lang in enumerate(kwargs['eval_lang']):
                 tmp = kwargs.copy()
@@ -85,4 +75,4 @@ if __name__ == '__main__':
         # infererence generation runs evaluation on all evaluation languaes at once
         inference_generation.main(**kwargs)
 
-        logger.info(f"finished inference...")
+        print(f"finished inference...")

@@ -103,13 +103,18 @@ def translate_passages(passage_col:pd.Series, all_passages:list, source_lang:str
 
 
 def get_dataset(**kwargs):
-    if kwargs["retrieval_step"] or kwargs["generation_step"]:
+    if kwargs["retrieval_step"]:
         dataset = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
         train_dataset, _ = preprocessing.test_split(dataset)
         return train_dataset
 
     if kwargs["rerank_step"]:
         dataset =  pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/{kwargs['source_langs'][0]}_{kwargs['extended_rerank_dataset_fname']}")
+        train_dataset, _ = preprocessing.test_split(dataset)
+        return train_dataset
+    
+    if kwargs["generation_step"]:     
+        dataset =  pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_rerank_pretrain/{kwargs['source_langs'][0]}_{kwargs['extended_generation_dataset_fname']}")
         train_dataset, _ = preprocessing.test_split(dataset)
         return train_dataset
 
@@ -174,14 +179,7 @@ def main(**kwargs):
         if kwargs["generation_step"] and not os.path.exists(generation_path):
             colnames = ["query", "response"]
             generation_translated_df = translate(df=train_dataset, colnames=colnames, source_lang=source_lang, target_lang=target_lang)
-
-            # # check if passages are already translated in preceding translate steps
-            # if os.path.exists(retrieval_path): 
-            #     generation_tmp = pd.read_json(retrieval_path, lines=True)
-            #     generation_translated_df["passages"]    = generation_tmp["passages"].tolist()
-            #     generation_translated_df["query"]       = generation_tmp["query"].tolist()
-            # else:
-            generation_translated_df["passages"] = translate_passages(passage_col= generation_translated_df["passages"], all_passages=all_passages, source_lang=source_lang, target_lang=target_lang)
+            generation_translated_df["rerank"] = translate_passages(passage_col= generation_translated_df["rerank"], all_passages=all_passages, source_lang=source_lang, target_lang=target_lang)
             generation_translated_df["lang"] = target_lang
 
             preprocessing.save_to_json(df=generation_translated_df, export_cols=generation_translated_df.columns, fname= f"ttrain_generation_{target_lang}.json", pdir=kwargs["cache_dir"])

@@ -42,7 +42,7 @@ class DocumentGroundedDialogGeneratePreprocessor(Preprocessor):
             os.path.join(self.model_dir, 'rerank'))
 
         if kwargs["translate_mode"] == "test":
-            self.generation_tokenizer = T5Tokenizer.from_pretrained("t5-small")
+            self.generation_tokenizer = T5Tokenizer.from_pretrained("t5-base")
             special_tokens = {"eos_token": "</s>", "unk_token": "<unk>", "pad_token": "<pad>"}
             self.generation_tokenizer.add_special_tokens(special_tokens)
             additional_tokens = ["<last_turn>", "<user>", "<agent>", "<response>", "<passage>"]

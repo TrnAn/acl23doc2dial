@@ -107,7 +107,13 @@ def main(**kwargs):
     parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
 
     # replace native lang wth translations vi -> vi2en; fr -> fr2en
-    for file_name in kwargs["source_langs"] + kwargs["target_langs"]:
+    # if kwargs["translate_mode"] in ["train", "test"]:
+    #     passage_langs =  kwargs["source_langs"] + kwargs["target_langs"]
+    # else:
+    #     passage_langs = langs
+    
+    passage_langs = ["fr", "vi", "en", "cn"]
+    for file_name in passage_langs:
         with open(f'./{parent_dir}/{file_name}.json', encoding="utf-8-sig") as f:
             all_passages = json.load(f)
             for every_passage in all_passages:

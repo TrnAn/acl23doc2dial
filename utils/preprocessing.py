@@ -89,6 +89,7 @@ def get_args():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
     parser.add_argument("---extended-rerank-dataset-fname", help= "Specifiy cache dir to save model to", type= str, default= "extended_rerank_dataset.json")
+    parser.add_argument("---extended-generation-dataset-fname", help= "Specifiy cache dir to save model to", type= str, default= "extended_generation_dataset.json")
     parser.add_argument("--eval-input-file", help= "File to read eval dataset (query, rerank, response) from", type=str, default=None)
     parser.add_argument("--eval-lang", help= "Specify list of languages to train models on, e.g., [['fr', 'vi'], ['fr'], ['vi']]", type=eval)
     parser.add_argument("--lang-token", help= "Add language token <lang> to input", action=argparse.BooleanOptionalAction, default=None)
@@ -126,8 +127,7 @@ def add_translation2trainset(train_df:pd.DataFrame, lang:str, pipeline_step:str,
     translated_df = pd.read_json(f"{dir}/ttrain_{pipeline_step}_{lang}.json", lines=True, encoding="utf-8-sig")
     if pipeline_step == "generation":
         translated_df = translated_df.rename({"passages": "rerank"},  axis='columns')
-        # translated_df["rerank"] = translated_df["rerank"].fillna("[]")
-        # translated_df["query"] = translated_df["query"].fillna("")
+
         translated_df = translated_df.dropna(subset=['query'])
     translated_df["lang"] = lang 
     print(f"example of translated datapoints: {translated_df.head(2)}")
@@ -141,8 +141,6 @@ def add_translation2trainset(train_df:pd.DataFrame, lang:str, pipeline_step:str,
 
 
 def get_unique_passages(df:pd.DataFrame, lang:str=None):
-    # new_passages = df['passages'].dropna()
-    # unique_passages = new_passages.apply(eval).explode().tolist() #list(set(chain.from_iterable(passages)))
     unique_passages = df["positive"].tolist() + df["negative"].tolist()
     if lang is not None:
         unique_passages = [f"{LANG_TOKENS_DD[lang]} {p}" for p in unique_passages]

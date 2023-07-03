@@ -63,11 +63,14 @@ def main(**kwargs):
 
     if "en" in langs:
         train_dataset_en = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/en_{kwargs['extended_rerank_dataset_fname']}")
+        
         # train_dataset_en["lang"]        = "en"
         train_dataset_en['output']      = train_dataset_en['output'].apply(eval)
 
     if "cn" in langs:
         train_dataset_cn = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/cn_{kwargs['extended_rerank_dataset_fname']}")
+        print(train_dataset_cn.columns)
+        print(train_dataset_cn.head(1))
         # train_dataset_cn["lang"]        = "cn"
         train_dataset_cn['output']      = train_dataset_cn['output'].apply(eval)
 
@@ -79,9 +82,6 @@ def main(**kwargs):
         train_dataset_fr = pd.DataFrame(list(train_dataset_fr))
         train_dataset_fr["lang"] = "fr"
 
-        # if kwargs["lang_token"]:
-        #     train_dataset_fr = preprocessing.add_lang_token(train_dataset_fr, "fr", ["input"]) 
-        #     train_dataset_fr['passages'] = train_dataset_fr['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['fr']} {d['text']}"} for d in eval(x)],ensure_ascii=False))
    
     if "vi" in langs:
         train_dataset_vi = MsDataset.load(
@@ -91,10 +91,6 @@ def main(**kwargs):
         train_dataset_vi = pd.DataFrame(list(train_dataset_vi))
 
         train_dataset_vi["lang"] = "vi"
-
-        # if kwargs["lang_token"]:
-        #     train_dataset_vi = preprocessing.add_lang_token(train_dataset_vi, "vi", ["input"]) 
-        #     train_dataset_vi['passages'] = train_dataset_vi['passages'].apply(lambda x: json.dumps([{'pid': d['pid'], 'text': f"{preprocessing.LANG_TOKENS_DD['vi']} {d['text']}"} for d in eval(x)], ensure_ascii=False))
 
 
     train_dataset_fr, dev_dataset_fr = preprocessing.test_split(train_dataset_fr)
@@ -107,22 +103,7 @@ def main(**kwargs):
         pipeline_step = 'rerank'
         train_dataset_vi = add_translation2trainset(train_df=train_dataset_vi, lang='vi', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])
         train_dataset_fr = add_translation2trainset(train_df=train_dataset_fr, lang='fr', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])
-        # ttrain_vi = pd.read_json(f"{kwargs['cache_dir']}/ttrain_rerank_vi.json", lines=True)
-        # ttrain_vi["lang"] = "vi" 
-        # old_size = len(train_dataset_vi)
-        # train_dataset_vi = pd.concat([train_dataset_vi, ttrain_vi])
-        # train_dataset_vi = train_dataset_vi.reset_index(drop=True)
-        # new_size = len(train_dataset_vi)
-        # print(f"added {new_size - old_size} new datapoints to vi train dataset...")
-
-        # ttrain_fr = pd.read_json(f"{kwargs['cache_dir']}/ttrain_rerank_fr.json", lines=True)
-        # ttrain_fr["lang"] = "fr" 
-        # old_size = len(train_dataset_fr)
-        # train_dataset_fr = pd.concat([train_dataset_fr, ttrain_fr])
-        # train_dataset_fr = train_dataset_fr.reset_index(drop=True)
-        # new_size = len(train_dataset_fr)
-        # print(f"added {new_size - old_size} new datapoints to fr train dataset...")
-
+    
 
     if kwargs["lang_token"]:
         if "vi" in langs:
@@ -169,6 +150,12 @@ def main(**kwargs):
     
     trainer.train()
     trainer.evaluate(eval_lang=kwargs["eval_lang"])
+
+    extended_lang = langs - set(["fr", "vi"])
+    if len(extended_lang) > 0:
+        for lang_tag in extended_lang:
+            combined_df = pd.concat([lang_dd[lang_tag][0], lang_dd[lang_tag][1]])
+            trainer.save_dataset(dataset=combined_df.to_dict('records'), fname=f"{lang_tag}_{kwargs['extended_generation_dataset_fname']}")
 
 
 if __name__ == '__main__':
