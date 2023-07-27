@@ -52,7 +52,7 @@ class DocumentGroundedDialogRetrievalPreprocessor(Preprocessor):
                            ) and invoke_mode != ModeKeys.INFERENCE:
             query, positive, negative = data['query'], data['positive'], data[
                 'negative']
-
+           
             query_tokenizer_outputs = self.tokenizer.batch_encode_plus(
                 query,
                 padding=True,

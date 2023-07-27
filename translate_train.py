@@ -1,5 +1,5 @@
 from transformers import AutoModelForSeq2SeqLM
-from transformers import NllbTokenizer
+from transformers import NllbTokenizerFast
 import os
 import pandas as pd
 import torch
@@ -15,17 +15,23 @@ tqdm.pandas()
 
 # from utils import preprocessing
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model  = AutoModelForSeq2SeqLM.from_pretrained("facebook/nllb-200-distilled-600M").to(device)
-tokenizer   = NllbTokenizer.from_pretrained("facebook/nllb-200-distilled-600M")
-    
+model  = AutoModelForSeq2SeqLM.from_pretrained("facebook/nllb-200-distilled-1.3B")
+tokenizer   = NllbTokenizerFast.from_pretrained("facebook/nllb-200-distilled-1.3B") #facebook/nllb-200-distilled-600M
+# print(f"{tokenizer.additional_special_tokens=}")
+# new_special_tokens = tokenizer.additional_special_tokens + ["<last_turn>", "<user>", "<agent>", "<response>", "<passage>"]
+# tokenizer.add_tokens(["<last_turn>", "<user>", "<agent>", "<response>", "<passage>"], special_tokens=True)
+# model.resize_token_embeddings(len(tokenizer))
+model.to(device)
+
+
 iso_lang = {
     "fr": "fra_Latn",
     "vi": "vie_Latn",
     "en": "eng_Latn"
 }
 
-def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:int=256):
-    tokenize  = lambda x: tokenizer(x, return_tensors="pt",  padding=True, truncation=True).to(model.device)
+def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:int=128):
+    tokenize  = lambda x: tokenizer(x, padding=True, truncation=True, return_tensors="pt").to(model.device)
 
     df_translate = df.copy()
     
@@ -52,7 +58,7 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:in
     return df_translate
 
 
-def translate_passage_text(passage_col, target_lang:str, source_lang:str, batch_size:int=256):
+def translate_passage_text(passage_col, target_lang:str, source_lang:str, batch_size:int=128):
     tokenize  = lambda x: tokenizer(x, return_tensors="pt",  padding=True, truncation=True).to(model.device)
     unique_texts = pd.unique(passage_col.explode().apply(lambda x: x.get('text')))
 
@@ -78,7 +84,7 @@ def translate_passage_text(passage_col, target_lang:str, source_lang:str, batch_
     return translated_col
 
 
-def translate_passages(passage_col:pd.Series, all_passages:list, source_lang:str, target_lang:str, batch_size:int=256):
+def translate_passages(passage_col:pd.Series, all_passages:list, target_lang:str, batch_size:int=128):
     tokenize  = lambda x: tokenizer(x, return_tensors="pt",  padding=True, truncation=True).to(model.device)
 
     with torch.no_grad():
@@ -114,7 +120,7 @@ def get_dataset(**kwargs):
         return train_dataset
     
     if kwargs["generation_step"]:     
-        dataset =  pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_rerank_pretrain/{kwargs['source_langs'][0]}_{kwargs['extended_generation_dataset_fname']}")
+        dataset =  pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_ranking_pretrain/{kwargs['source_langs'][0]}_{kwargs['extended_generation_dataset_fname']}")
         train_dataset, _ = preprocessing.test_split(dataset)
         return train_dataset
 
@@ -126,6 +132,7 @@ def replace_passages(passage_column:pd.Series, all_passages:dict[str]):
 
 
 def main(**kwargs):
+
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
@@ -137,15 +144,16 @@ def main(**kwargs):
     logger = logging.getLogger()
 
     logger.info(f"enter translate-{kwargs['translate_mode']} mode on {device=}...")
-    train_dataset = get_dataset(**kwargs)
-
+    train_dataset = get_dataset(**kwargs).head(10)
+    preprocessing.save_to_json(df=train_dataset, export_cols=train_dataset.columns, fname= f"ttrain_original_{kwargs['source_langs'][0]}.json", pdir=kwargs["cache_dir"])
     if train_dataset is None: # translate dataset already exists
         return 0
     
-    train_dataset["passages"] = train_dataset["passages"].apply(eval)
+    passage_colname = "passages" if "passages" in train_dataset.columns else "rerank"
+    train_dataset[passage_colname] = train_dataset[passage_colname].apply(eval)
 
     if kwargs["retrieval_step"] or kwargs["generation_step"]:
-        all_passages = train_dataset["passages"].explode().unique()
+        all_passages = train_dataset[passage_colname].explode().unique()
 
     source_lang = kwargs["source_langs"][0]
     for target_lang in kwargs["target_langs"]:
@@ -162,7 +170,7 @@ def main(**kwargs):
                                                 source_lang=source_lang, 
                                                 target_lang=target_lang)
             
-            retrieval_translated_df["passages"] = translate_passages(passage_col= retrieval_translated_df["passages"], all_passages=all_passages, source_lang=source_lang, target_lang=target_lang)
+            retrieval_translated_df["passages"] = translate_passages(passage_col= retrieval_translated_df["passages"], all_passages=all_passages, target_lang=target_lang)
             retrieval_translated_df["lang"]     = target_lang
 
             preprocessing.save_to_json(df=retrieval_translated_df, export_cols=retrieval_translated_df.columns, fname= retrieval_fname, pdir=kwargs["cache_dir"])

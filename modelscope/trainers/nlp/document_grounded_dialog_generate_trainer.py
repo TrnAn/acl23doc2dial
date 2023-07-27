@@ -250,7 +250,7 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
                 )
 
             print("save best model")
-            print(f"tessst: {self.model.model.generator.rag.generator.config=}")
+
             meters = self.evaluate(batch_size=batch_size)
             total_score = sum([x for x in meters.values()])
             if total_score >= best_score:

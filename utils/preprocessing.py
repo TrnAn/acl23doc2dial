@@ -10,7 +10,7 @@ import os
 from ast import literal_eval
 import argparse
 from itertools import chain
-
+from rank_bm25 import BM25Okapi
 
 logger = get_logger()
 
@@ -85,6 +85,19 @@ def save_to_json(df:pd.DataFrame, export_cols:list, fname:str="dev.json", pdir:s
     logger.info("DONE...")
 
 
+def add_hard_negatives(query, positive, negative, corpus:list, n:int=0):
+    corpus = list(set(corpus) -  set([positive, negative]))
+    tokenized_corpus = [doc.lower().split(" ") for doc in corpus]
+
+    bm25 = BM25Okapi(tokenized_corpus)
+
+    tokenized_query = query.lower().split(" ")
+    top_n = bm25.get_top_n(tokenized_query, corpus, n=n)
+
+    print(f"{[positive] + [negative] + top_n}")
+    return [negative] + top_n
+
+
 def get_args():
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     parser.add_argument("--cache-dir", help= "Specifiy cache dir to save model to", type= str, default= ".")
@@ -109,10 +122,23 @@ def get_args():
     parser.add_argument("--save-output", help= "Save output of current pipeline step", type=int, default=0) 
     parser.add_argument("--translate-mode", help= "Specify source languages", type=str, default="") 
     parser.add_argument("--is-inference", help= "is inference pipeline step", action=argparse.BooleanOptionalAction)
+    parser.add_argument("--equal-dataset-size", help= "Set all datasets to comparable dataset sizes", type=int, default=0) 
+    parser.add_argument("--add-n-hard-negatives", help= "Set number of hard negatives to add to existing negative passages", type=int, default=0) 
 
     args, _ = parser.parse_known_args()
 
     return vars(args)
+
+
+def get_equal_dataset_size_by_lang(df:pd.DataFrame):
+    logger.info("set datasets to equal sizes...")
+    grouped = df.groupby('lang')
+    # Find the size of each group and get the minimum group size
+    min_group_size = grouped.size().astype(int).min()
+    # Sample 'n' values from each group
+    sampled_df = grouped.apply(lambda x: x.sample(min_group_size))
+
+    return sampled_df.reset_index(drop=True)
 
 
 def get_unique_langs(arr):

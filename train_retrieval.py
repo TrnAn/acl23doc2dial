@@ -6,9 +6,11 @@ from modelscope.trainers.nlp.document_grounded_dialog_retrieval_trainer import \
     DocumentGroundedDialogRetrievalTrainer
 import utils.preprocessing as preprocessing
 from utils.seed import set_seed
-from utils.preprocessing import get_args, add_translation2trainset, get_unique_passages
+from utils.preprocessing import get_args, add_translation2trainset, get_unique_passages, add_hard_negatives
+import utils.data_exploration as exploration
 set_seed()
-
+from tqdm import tqdm
+tqdm.pandas()
 
 def main(**kwargs):
     fr_train_dataset, vi_train_dataset, en_train_dataset, cn_train_dataset = None, None, None, None
@@ -17,13 +19,15 @@ def main(**kwargs):
     if "fr" in langs:
         fr_train_dataset = preprocessing.read('DAMO_ConvAI/FrDoc2BotRetrieval')
         fr_train_dataset["lang"] = "fr"
+
     if "vi" in langs:
         vi_train_dataset = preprocessing.read('DAMO_ConvAI/ViDoc2BotRetrieval')
         vi_train_dataset["lang"] = "vi" 
+
     if "en" in langs:
         en_train_dataset = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
         en_train_dataset["lang"] = "en"
-        print(f"{en_train_dataset.head(1)['response']}")
+
     if "cn" in langs:
         cn_train_dataset = pd.read_json("cn_train_dataset_in_domain.json", lines=True)
         cn_train_dataset["lang"] = "cn"
@@ -38,24 +42,7 @@ def main(**kwargs):
     if kwargs["translate_mode"] == "train":
         pipeline_step= 'retrieval'
         train_dataset_vi = add_translation2trainset(train_df=train_dataset_vi, lang='vi', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])
-        train_dataset_fr = add_translation2trainset(train_df=train_dataset_fr, lang='fr', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])
-
-        # ttrain_vi = pd.read_json(f"ttrain_retrieval_vi.json", lines=True)
-        # ttrain_vi["lang"] = "vi" 
-        # old_size = len(train_dataset_vi)
-        # train_dataset_vi = pd.concat([train_dataset_vi, ttrain_vi])
-        # train_dataset_vi = train_dataset_vi.reset_index(drop=True)
-        # new_size = len(train_dataset_vi)
-        # print(f"added {new_size - old_size} new datapoints to vi train dataset...")
-
-        # ttrain_fr = pd.read_json(f"ttrain_retrieval_fr.json", lines=True)
-        # ttrain_fr["lang"] = "fr" 
-        # old_size = len(train_dataset_fr)
-        # train_dataset_fr = pd.concat([train_dataset_fr, ttrain_fr])
-        # train_dataset_fr = train_dataset_fr.reset_index(drop=True)
-        # new_size = len(train_dataset_fr)
-        # print(f"added {new_size - old_size} new datapoints to fr train dataset...")
-    
+        train_dataset_fr = add_translation2trainset(train_df=train_dataset_fr, lang='fr', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])    
 
     if kwargs["lang_token"]:
         train_dataset_fr    = preprocessing.add_lang_token(train_dataset_fr, "fr", colnames=["query", "positive", "negative"]) 
@@ -88,14 +75,20 @@ def main(**kwargs):
     dev_dataset     = pd.concat(dev_dataset)
 
     if kwargs["translate_mode"] == "test":
+
         save_dev_dataset = []
         for lang in kwargs["source_langs"] + kwargs["target_langs"]:
-            print(lang)
             _, dev = lang_dd[lang]
             save_dev_dataset.append(dev)
         save_dev_dataset = pd.concat(save_dev_dataset)
+
     else:
         save_dev_dataset = dev_dataset
+
+    if kwargs["equal_dataset_size"]:
+        train_dataset       = preprocessing.get_equal_dataset_size_by_lang(train_dataset)
+        dev_dataset         = preprocessing.get_equal_dataset_size_by_lang(dev_dataset)
+        save_dev_dataset    = preprocessing.get_equal_dataset_size_by_lang(save_dev_dataset)
 
     preprocessing.save_to_json(save_dev_dataset, save_dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
 
@@ -110,11 +103,23 @@ def main(**kwargs):
                 translated_passages += get_unique_passages(locals()[f"train_dataset_{lang}"], lang=lang) if kwargs["lang_token"] else get_unique_passages(locals()[f"train_dataset_{lang}"])
                 
     all_passages_w_translations =  list(set(all_passages) | set(translated_passages))
-
-    # if kwargs["batch_accumulation"]:
-    #     kwargs["gradient_accumulation_steps"] = kwargs["batch_size"] // (kwargs["num_devices"] * kwargs["per_gpu_batch_size"])
-    # print(f"BATCH SIZE: {kwargs['per_gpu_batch_size']}")
     
+    freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
+    exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_retrieval.png")
+
+    print(f"{train_dataset.columns=}")
+    
+    print(f"{kwargs['add_n_hard_negatives']=}")
+    train_dataset["negative"] = train_dataset.progress_apply(lambda x:  add_hard_negatives(
+            query=x["query"], 
+            positive=x["positive"], 
+            negative=x["negative"], 
+            corpus=all_passages_w_translations, 
+            n=kwargs["add_n_hard_negatives"]), 
+        axis=1)
+    
+    print(f"{train_dataset.head(2)['negative']=}")
+
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=kwargs["cache_dir"])
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
@@ -129,7 +134,7 @@ def main(**kwargs):
 
     trainer.train(
         batch_size=128,
-        total_epoches=10,
+        total_epoches=50,
         accumulation_steps=kwargs["gradient_accumulation_steps"],
         loss_log_freq=1
         # per_gpu_batch_size=args.per_gpu_batch_size,

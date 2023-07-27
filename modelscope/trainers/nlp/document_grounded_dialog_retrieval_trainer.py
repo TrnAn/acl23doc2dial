@@ -20,14 +20,16 @@ from modelscope.utils.logger import get_logger
 from torchsummary import summary
 from utils.preprocessing import save_to_json
 import pandas as pd
+import numpy as np
 from typing import Union, Any, Dict
 logger = get_logger()
-
 
 def collate(batch):
     query = [item['query'] for item in batch]
     positive = [item['positive'] for item in batch]
-    negative = [item['negative'] for item in batch]
+    # negative = [item['negative'] for item in batch]
+    negative = np.array([item['negative'] for item in batch]).ravel().tolist()
+
     lang = [item['lang'] for item in batch]
     return query, positive, negative, lang
 
@@ -166,9 +168,9 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 )
 
             meters = self.evaluate(per_gpu_batch_size=per_gpu_batch_size)
-         
+
             # total_score = sum([x for x in meters.values()])
-            total_score = sum(sum(meter.values()) for meter in meters.values()) # score on all eval lang combinations
+            total_score = sum(sum(meter.values()) for meter in meters.values()) # score on all eval lang combiscancel nations
             logger.info(
                 f'obtain max score: {total_score:.4f}')
             
@@ -228,11 +230,9 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     if bool(set(curr_lang) & set(lang)) == 0: # language is not in current batch
                         continue
 
-                    query, positive, negative, curr_lang = zip(*[(q, p, n, l) for q, p, n, l in zip(query, positive, negative, curr_lang) if l in lang])
+                    query, positive = zip(*[(q, p) for q, p, l in zip(query, positive, curr_lang) if l in lang])
                     query = list(query)
                     positive = list(positive)
-                    negative = list(negative)
-                    curr_lang = list(curr_lang)
 
                     processed = self.preprocessor({'query': query},
                                                 invoke_mode=ModeKeys.INFERENCE)

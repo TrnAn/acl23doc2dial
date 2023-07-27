@@ -38,7 +38,7 @@ class myDocumentGroundedDialogRerankPipeline(DocumentGroundedDialogRerankPipelin
     def save(self, addr):
         file_out = open(addr, 'w')
         for every_dict in self.guess:
-            file_out.write(json.dumps(every_dict) + '\n')
+            file_out.write(json.dumps(every_dict, ensure_ascii=False) + '\n')
 
 
 def main(**kwargs):

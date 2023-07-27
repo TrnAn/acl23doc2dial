@@ -130,22 +130,18 @@ def main(**kwargs):
         return 0
     
     target_lang = kwargs["target_langs"][0]
-    tmp_dfs = [train_dataset[train_dataset['lang'] == target_lang]]
     for source_lang in kwargs["source_langs"]:
         logger.info(f'translate {source_lang} dataset to {target_lang=}')
 
-        retrieval_fname = f"ttest_{'_'.join(kwargs['source_langs'])}2{target_lang}.json"
+        retrieval_fname = f"ttest_{source_lang}2{target_lang}.json"
         retrieval_path  = os.path.join(kwargs["cache_dir"], retrieval_fname)
         
         if kwargs["retrieval_step"] and not os.path.exists(retrieval_path):
             retrieval_translated_df         = translate(df=train_dataset[train_dataset['lang'] == source_lang], colnames=["query", "positive", "negative"], source_lang=source_lang, target_lang=target_lang, lang_token=kwargs["lang_token"])
-            retrieval_translated_df["lang"] = target_lang
-            tmp_dfs += [retrieval_translated_df]
+            retrieval_translated_df["lang"] = source_lang
             save_all_passages(source_lang=source_lang, target_lang=target_lang, lang_token=kwargs["lang_token"], cache_dir=kwargs["cache_dir"])
 
-    translated_df = pd.concat(tmp_dfs)
-    print(f"{translated_df.head(2)=}")
-    preprocessing.save_to_json(df=translated_df, export_cols=translated_df.columns, fname= retrieval_fname, pdir=kwargs["cache_dir"])
+            preprocessing.save_to_json(df=retrieval_translated_df, export_cols=retrieval_translated_df.columns, fname= retrieval_fname, pdir=kwargs["cache_dir"])
 
     logger.info("done...")
 

@@ -10,6 +10,7 @@ import pandas as pd
 import utils.preprocessing as preprocessing
 from utils.seed import set_seed
 from utils.preprocessing import get_args, add_translation2trainset
+import utils.data_exploration as exploration
 set_seed()
 
 
@@ -140,6 +141,13 @@ def main(**kwargs):
 
     train_dataset   = tmp_df[:len(train_dataset)]
     dev_dataset     = tmp_df[len(train_dataset):]
+
+    if kwargs["equal_dataset_size"]:
+        train_dataset    = preprocessing.get_equal_dataset_size_by_lang(train_dataset)
+        dev_dataset      = preprocessing.get_equal_dataset_size_by_lang(dev_dataset)
+    
+    freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
+    exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_rerank.png")
 
     trainer = DocumentGroundedDialogRerankTrainer(
         model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 

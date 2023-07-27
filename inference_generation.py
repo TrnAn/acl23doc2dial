@@ -21,10 +21,10 @@ def main(**kwargs):
 
     # if kwargs["translate_mode"] == "train":
     id_to_passage = {}
-    with open(f'{kwargs["cache_dir"]}/rerank_output.jsonl') as f_in:
+    with open(f'{kwargs["cache_dir"]}/rerank_output.jsonl', encoding="utf-8-sig") as f_in:
         for line in f_in.readlines():
             sample = json.loads(line)
-
+            print(f"{sample=}")
             # add translated passages to id_to_passage mapping
             # if sample["lang"] in kwargs["target_langs"]:
             for passage_dict in sample["passages"]:
@@ -32,7 +32,7 @@ def main(**kwargs):
 
 
     eval_dataset = []
-    with open(f'{kwargs["cache_dir"]}/rerank_output.jsonl') as f_in:
+    with open(f'{kwargs["cache_dir"]}/rerank_output.jsonl', encoding="utf-8-sig") as f_in:
         for line in f_in.readlines():
             # 
             sample = json.loads(line)

@@ -17,16 +17,18 @@ def main(**kwargs):
     # 2. and concat json with prev json data to save input.jsonl
 
     if kwargs["translate_mode"] == "test":
-        retrieval_fname = f"ttest_{'_'.join(kwargs['source_langs'])}2{kwargs['target_langs'][0]}.json"
-        retrieval_path  = os.path.join(kwargs["cache_dir"], retrieval_fname)
+        retrieval_fnames = [f"ttest_{src_lang}2{kwargs['target_langs'][0]}.json" for src_lang in kwargs['source_langs']]
+        retrieval_paths  = [os.path.join(kwargs["cache_dir"], retrieval_fname) for retrieval_fname in retrieval_fnames]
     else:
-        retrieval_path  = f'{kwargs["cache_dir"]}/{kwargs["eval_input_file"]}'
+        retrieval_paths  = [f'{kwargs["cache_dir"]}/{kwargs["eval_input_file"]}']
 
-    with open(retrieval_path) as f_in:
-        with open(f'{kwargs["cache_dir"]}/input.jsonl', 'w') as f_out:
-            for line in f_in.readlines():
-                sample = json.loads(line)
-                f_out.write(json.dumps(sample, ensure_ascii=False) + '\n')
+    for idx, retrieval_path in enumerate(retrieval_paths):
+        filemode = "w" if idx == 0 else "a"
+        with open(retrieval_path) as f_in:
+            with open(f'{kwargs["cache_dir"]}/input.jsonl', filemode) as f_out:
+                for line in f_in.readlines():
+                    sample = json.loads(line)
+                    f_out.write(json.dumps(sample, ensure_ascii=False) + '\n')
 
     with open(f'{kwargs["cache_dir"]}/input.jsonl') as f:
         eval_dataset = [json.loads(line) for line in f.readlines()]

@@ -25,6 +25,8 @@ import seaborn as sns
 import utils.data_exploration as exploration
 sns.set(style='whitegrid')
 sns.set_palette('pastel')
+from torch.cuda.amp import GradScaler
+from torch import autocast
 
 logger = get_logger()
 import sys
@@ -141,11 +143,13 @@ def measure_result(result_dict):
 
     pattern = r"^<response>\s*|^<[^>]+>\s*"
     hypothesis_list = [
-        re.sub(pattern, '', x) if len(x) > 10 else 'placeholder' for x in hypothesis_list 
+        re.sub(pattern, '', x) for x in hypothesis_list if not re.match(r'^\.+$', x)
         ]
+
+        # if len(x) > 10 else 'placeholder' 
     reference_list = [
         re.sub(pattern, '', x) for x in result_dict['targets']
-    ] # .replace('<response>', '') 
+    ] 
     instance_num = len(reference_list)
 
     # F1
@@ -164,7 +168,7 @@ def measure_result(result_dict):
     rouge_func = Rouge()
     rouge_score = [
         x['rouge-l']['f']
-        for x in rouge_func.get_scores(hypothesis_list, reference_list)
+        for x in rouge_func.get_scores(hypothesis_list, reference_list, ignore_empty=True)
     ]
     rouge_score = (sum(rouge_score) / instance_num) * 100
     meters['rouge'] = rouge_score
@@ -193,7 +197,7 @@ def train(trainer,
         batch_size=batch_size,
         shuffle=True,
         collate_fn=collate,
-        # num_workers=2,
+        num_workers=2,
         pin_memory=True)
 
     optimizer = prepare_optimizer(trainer.model.model, learning_rate,
@@ -201,12 +205,16 @@ def train(trainer,
     steps_per_epoch = len(train_loader) // accumulation_steps
     scheduler = prepare_scheduler(optimizer, total_epoches,
                                   steps_per_epoch, warmup_ratio)
-    best_score = 0.0
+    best_score = 0.0# Runs the forward pass with autocasting.
+
+    
     for epoch in range(total_epoches):
         trainer.model.model.train()
         losses = []
-        for index, payload in enumerate(tqdm.tqdm(train_loader)):
+        for index, payload in enumerate(tqdm.tqdm(train_loader)):  
             query, context, label,_ = payload
+
+            enc = tokenizer([query[0]], add_special_tokens=False, return_tensors='pt')['input_ids'][0][:128]
 
             query = [
                 tokenizer.decode(
@@ -218,11 +226,12 @@ def train(trainer,
                 ' '.join([query[i], '<passage>', context[i][0]])
                 for i in range(len(query))
             ]
-            
-            # input_ids = tokenizer.batch_encode_plus(
-            #     list(generator_inputs), padding=True, return_tensors='pt').input_ids.to(device)            
+    
             input_ids = tokenizer.batch_encode_plus(
-                list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device)
+                list(generator_inputs), padding=True,  max_length=2000, truncation=True, return_tensors='pt').input_ids.to(device)    
+
+            # input_ids = tokenizer.batch_encode_plus(
+            #     list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device)
             label_ids = tokenizer.batch_encode_plus(
                 list(label), padding=True, return_tensors='pt').input_ids.to(device)
 
@@ -238,6 +247,7 @@ def train(trainer,
                 optimizer.step()
                 scheduler.step()
                 optimizer.zero_grad()
+
             losses.append(loss.item())
             if (index + 1) % loss_log_freq == 0:
                 logger.info(
@@ -249,23 +259,21 @@ def train(trainer,
             logger.info(
                 f'epoch: {epoch} \t batch: last \t loss: {sum(losses) / len(losses)}'
             )
-
+        
         meters = evaluate(trainer, eval_lang=eval_lang,  batch_size=batch_size)
         total_score = sum(sum(meter.values()) for meter in meters.values())
         if total_score >= best_score:
             best_score = total_score
             model_path = os.path.join(trainer.model.model_dir,
-                                      'finetuned_model.bin')
+                                    'finetuned_model.bin')
             
             state_dict = trainer.model.model.state_dict()
             torch.save(state_dict, model_path)
-            # if is_translate_test:
-            #     trainer.model.model.generator.rag.generator.config.save_pretrained(os.path.join(trainer.model.model_dir, "generation"))
-            #     trainer.model.model.rerank.encoder.roberta.config.save_pretrained(os.path.join(trainer.model.model_dir,"rerank"))
 
             logger.info(
                 'epoch %d obtain max score: %.4f, saving model to %s' %
                 (epoch, total_score, model_path))
+            
 
 
 def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
@@ -280,7 +288,7 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
     trainer.model.model.eval()
     all_meters= {}
     for lang in eval_lang:
-        print(f"{lang=}")
+
         with torch.no_grad():
             valid_loader = DataLoader(
                 dataset=trainer.eval_dataset,
@@ -292,7 +300,6 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
                 query, context, label, curr_lang = payload
 
                 if bool(set(curr_lang) & set(lang)) == 0:
-                    print(f"no in lang: {set(curr_lang)=}")
                     continue
 
                 query, context, label, curr_lang = zip(*[(q, p, n, l) for q, p, n, l in zip(query, context, label, curr_lang) if l in lang]) # filter datapoints with lang
@@ -311,20 +318,21 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
                     for i in range(len(query))
                 ]
                 input_ids = tokenizer.batch_encode_plus(
-                    list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device) #padding=True
+                list(generator_inputs), padding=True, max_length=2000, truncation=True, return_tensors='pt').input_ids.to(device)
+                # input_ids = tokenizer.batch_encode_plus(
+                #     list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device) #padding=True
 
-                # length_penalty=length_penalty,
+
                 # outputs = model.generate(input_ids, num_beams=3, max_length=128, early_stopping=True,
                 #                         no_repeat_ngram_size=3)
-                length_penalty=1.2
+                length_penalty = 2
                 outputs = model.generate(
                     input_ids, 
                     num_beams=3, 
                     max_length=128, 
                     early_stopping=True,
                     no_repeat_ngram_size=3, 
-                    length_penalty=length_penalty,
-                    # min_length=4
+                    length_penalty=length_penalty
                     ) 
                 predictions = tokenizer.batch_decode(outputs, skip_special_tokens=True, clean_up_tokenization_spaces=False)
                 label = trainer.preprocessor.generation_tokenizer.batch_decode(
@@ -420,15 +428,17 @@ def main(**kwargs):
         train_dataset["rerank"]  = train_dataset.rerank.apply(eval)
         dev_dataset["rerank"]    = dev_dataset.rerank.apply(eval)
 
-    print(train_dataset["rerank"].head(1))
+    if kwargs["equal_dataset_size"]:
+        train_dataset       = preprocessing.get_equal_dataset_size_by_lang(train_dataset)
+        dev_dataset         = preprocessing.get_equal_dataset_size_by_lang(dev_dataset)
 
     if kwargs["eval_input_file"] is None:
         raise Exception("Please specify arg --eval-input-file to read eval dataset from")
     preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname="test.json", pdir=kwargs["cache_dir"])
 
-    if kwargs["lang_token"]:
-        freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
-        exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot')
+  
+    freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
+    exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_generation.png")
 
 
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir=kwargs["cache_dir"])
