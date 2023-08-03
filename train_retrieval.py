@@ -118,8 +118,6 @@ def main(**kwargs):
             n=kwargs["add_n_hard_negatives"]), 
         axis=1)
     
-    print(f"{train_dataset.head(2)['negative']=}")
-
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=kwargs["cache_dir"])
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,

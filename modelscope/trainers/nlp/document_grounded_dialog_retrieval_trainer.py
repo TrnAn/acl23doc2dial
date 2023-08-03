@@ -136,7 +136,12 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             self.model.model.train()
             losses = []
             for index, payload in enumerate(tqdm.tqdm(train_loader)):
-                query, positive, negative, lang = payload
+                query, positive, negative, _ = payload
+
+                print(f"before removing duplicates/FN: {len(negative)=}")
+                negative = list(set(negative)- set(positive))
+                print(f"after removing duplicates/FN: {len(negative)=}")
+
                 processed = self.preprocessor(
                     {
                         'query': query,
@@ -189,8 +194,6 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
         """
         Evaluate testsets
         """
-        # if self.only_english:
-        #     eval_lang = [["en"]]
 
         if checkpoint_path is not None:
             state_dict = torch.load(checkpoint_path)
@@ -198,7 +201,8 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
 
         self.model.model.eval()
         with torch.no_grad():
-            all_ctx_vector = []
+            all_ctx_vector  = []
+            all_passages    = []
             for mini_batch in tqdm.tqdm(
                     range(0, len(self.eval_passages), per_gpu_batch_size)):
                 context = self.eval_passages[mini_batch:mini_batch
@@ -210,11 +214,17 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 sub_ctx_vector = self.model.encode_context(
                     processed).detach().cpu().numpy()
                 all_ctx_vector.append(sub_ctx_vector)
+                all_passages += context
 
             all_ctx_vector = np.concatenate(all_ctx_vector, axis=0)
             all_ctx_vector = np.array(all_ctx_vector).astype('float32')
             faiss_index = faiss.IndexFlatIP(all_ctx_vector.shape[-1])
             faiss_index.add(all_ctx_vector) # context -> passages
+
+            logger.info(f"save passage embeddings to: {self.model.model_dir}/passage_embeddings.txt...")
+            passage_df = pd.DataFrame({"passage": all_passages, "embedding": all_ctx_vector.tolist()})
+            passage_df.to_csv(f'{self.model.model_dir}/passage_embeddings.csv', index=False)
+            logger.info("done")
 
             self.retrieval_results = {}
             all_meters = {}
@@ -238,6 +248,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                                                 invoke_mode=ModeKeys.INFERENCE)
                     query_vector = self.model.encode_query(
                         processed).detach().cpu().numpy().astype('float32')
+
                     D, Index = faiss_index.search(query_vector, 20)
                     results['outputs'] += [[
                         self.eval_passages[x] for x in retrieved_ids

@@ -45,9 +45,9 @@ def main(**kwargs):
     #     langs += [f"{src_lang}2{kwargs['target_langs'][0]}" for src_lang in kwargs["source_langs"]]
 
     all_passages = []
-    translated_passages = []
     
     for lang in langs:
+        print(f"{lang=}")
         with open(f'{parent_dir}/{lang}.json', encoding='utf-8-sig') as f:
             all_passages += json.load(f)
 
