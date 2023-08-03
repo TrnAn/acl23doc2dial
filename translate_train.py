@@ -10,19 +10,15 @@ import json
 import logging
 from utils.preprocessing import get_args
 from utils import preprocessing
+from itertools import chain
 from tqdm import tqdm
 tqdm.pandas()
 
 # from utils import preprocessing
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model  = AutoModelForSeq2SeqLM.from_pretrained("facebook/nllb-200-distilled-1.3B")
-tokenizer   = NllbTokenizerFast.from_pretrained("facebook/nllb-200-distilled-1.3B") #facebook/nllb-200-distilled-600M
-# print(f"{tokenizer.additional_special_tokens=}")
-# new_special_tokens = tokenizer.additional_special_tokens + ["<last_turn>", "<user>", "<agent>", "<response>", "<passage>"]
-# tokenizer.add_tokens(["<last_turn>", "<user>", "<agent>", "<response>", "<passage>"], special_tokens=True)
-# model.resize_token_embeddings(len(tokenizer))
+device      = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model       = AutoModelForSeq2SeqLM.from_pretrained("facebook/nllb-200-distilled-1.3B")
+tokenizer   = NllbTokenizerFast.from_pretrained("facebook/nllb-200-distilled-1.3B")
 model.to(device)
-
 
 iso_lang = {
     "fr": "fra_Latn",
@@ -30,30 +26,59 @@ iso_lang = {
     "en": "eng_Latn"
 }
 
-def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:int=128):
+def _split_list_strings(text):
+    pattern         = r'<last_turn>|<user>|<agent>'
+    modified_text   = re.split(pattern, text)
+    tags            = re.findall(pattern, text)
+
+    return modified_text[1:], tags
+
+
+def _replace_tags_back(text, tags):
+    all_queries = []
+    for tags_of_query in tags:
+        query_w_tags = [f"{tag} {text.pop(0)}" for tag in tags_of_query]
+        all_queries.append(" ".join(query_w_tags))
+
+    return all_queries
+
+
+def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:int=256):
     tokenize  = lambda x: tokenizer(x, padding=True, truncation=True, return_tensors="pt").to(model.device)
 
     df_translate = df.copy()
     
     with torch.no_grad():
         for colname in colnames:
-            dataset     = df[colname].values.tolist()
+
+            if colname == "query":
+                queries, role_tags = zip(*df_translate[colname].apply(_split_list_strings))
+                queries = list(chain.from_iterable(queries))
+            else:
+                queries = df_translate[colname].tolist()
+
             data_loader = DataLoader(
-                dataset, 
+                dataset=queries, 
                 batch_size=batch_size, 
                 shuffle=False, 
-                num_workers=4, 
+                num_workers=2, 
                 pin_memory=True
                 )
             
             translated_query = []
-            for batch in tqdm(data_loader, desc=f"translate queries of column '{colname}'"):           
-                inputs = tokenize(batch)
-
+            for batch in tqdm(data_loader, desc=f"translate queries of column '{colname}'"):     
+                queries = batch 
+                inputs = tokenize(queries)
                 translated_tokens   = model.generate(**inputs, forced_bos_token_id=tokenizer.lang_code_to_id[iso_lang[target_lang]], max_length=256)
                 translated_query    += tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
 
-            df_translate[colname] = [re.sub(f'^<\s*{source_lang}\s*>\s*', '', q)  for q in translated_query]
+                translated_query = [re.sub(f'^<\s*{source_lang}\s*>\s*', '', q)  for q in translated_query]
+
+            if colname == "query":
+                translated_query = _replace_tags_back(text=translated_query, tags=role_tags)  # ' '.join(f"{x} {y}" for x, y in zip(tag, translated_query))
+
+            df_translate[colname] = translated_query
+            print(df_translate[colname].tolist())
 
     return df_translate
 
@@ -144,7 +169,9 @@ def main(**kwargs):
     logger = logging.getLogger()
 
     logger.info(f"enter translate-{kwargs['translate_mode']} mode on {device=}...")
-    train_dataset = get_dataset(**kwargs).head(10)
+    
+    train_dataset = get_dataset(**kwargs).head(128)
+    train_dataset.to_csv("the_original_en.csv", index=False)
     preprocessing.save_to_json(df=train_dataset, export_cols=train_dataset.columns, fname= f"ttrain_original_{kwargs['source_langs'][0]}.json", pdir=kwargs["cache_dir"])
     if train_dataset is None: # translate dataset already exists
         return 0
@@ -170,6 +197,8 @@ def main(**kwargs):
                                                 source_lang=source_lang, 
                                                 target_lang=target_lang)
             
+            print(f"{retrieval_translated_df.head(3)=}")
+
             retrieval_translated_df["passages"] = translate_passages(passage_col= retrieval_translated_df["passages"], all_passages=all_passages, target_lang=target_lang)
             retrieval_translated_df["lang"]     = target_lang
 
