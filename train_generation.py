@@ -318,7 +318,11 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
                     for i in range(len(query))
                 ]
                 input_ids = tokenizer.batch_encode_plus(
-                list(generator_inputs), padding=True, max_length=2000, truncation=True, return_tensors='pt').input_ids.to(device)
+                list(generator_inputs), 
+                padding=True, 
+                # max_length=2000, 
+                truncation=True, 
+                return_tensors='pt').input_ids.to(device)
                 # input_ids = tokenizer.batch_encode_plus(
                 #     list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device) #padding=True
 
@@ -360,8 +364,8 @@ def main(**kwargs):
     torch.backends.cuda.cudnn_enabled = True
 
     train_dataset_fr, train_dataset_vi, train_dataset_en, train_dataset_cn = None, None, None, None
-    langs = set(item for sublist in kwargs["eval_lang"] for item in sublist) 
-
+    # langs = set(item for sublist in kwargs["eval_lang"] for item in sublist) 
+    langs = set(kwargs["target_langs"]) if kwargs["translate_mode"] == "test" else set(item for sublist in kwargs["eval_lang"] for item in sublist) 
     if "en" in langs:
         # train_dataset_en = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
         train_dataset_en = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_ranking_pretrain/en_{kwargs['extended_generation_dataset_fname']}")
@@ -440,6 +444,8 @@ def main(**kwargs):
     freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
     exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_generation.png")
 
+    if kwargs["translate_mode"] == "test":
+        kwargs["eval_lang"] = [kwargs["target_langs"]]
 
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_generation_pretrain', cache_dir=kwargs["cache_dir"])
     trainer = DocumentGroundedDialogGenerateTrainer(

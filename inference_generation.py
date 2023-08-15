@@ -24,12 +24,12 @@ def main(**kwargs):
     with open(f'{kwargs["cache_dir"]}/rerank_output.jsonl', encoding="utf-8-sig") as f_in:
         for line in f_in.readlines():
             sample = json.loads(line)
-            print(f"{sample=}")
+       
             # add translated passages to id_to_passage mapping
             # if sample["lang"] in kwargs["target_langs"]:
             for passage_dict in sample["passages"]:
                 id_to_passage[passage_dict["pid"]] = passage_dict["text"]
-
+        print(f"{id_to_passage}")
 
     eval_dataset = []
     with open(f'{kwargs["cache_dir"]}/rerank_output.jsonl', encoding="utf-8-sig") as f_in:

@@ -59,7 +59,8 @@ def main(**kwargs):
         'gradient_accumulation_steps'] = kwargs['full_train_batch_size'] // (
             kwargs['per_gpu_train_batch_size'] * kwargs['world_size'])
     
-    langs = set(item for sublist in kwargs["eval_lang"] for item in sublist)
+    # langs = set(item for sublist in kwargs["eval_lang"] for item in sublist)
+    langs = set(kwargs["target_langs"]) if kwargs["translate_mode"] == "test" else set(item for sublist in kwargs["eval_lang"] for item in sublist) 
     train_dataset_fr,  train_dataset_vi, train_dataset_en, train_dataset_cn = None, None, None, None
 
     if "en" in langs:
@@ -128,7 +129,8 @@ def main(**kwargs):
 
     train_dataset = [] 
     dev_dataset = []
-    for lang in list(langs):
+   
+    for lang in langs:
         train, dev = lang_dd[lang]
         train_dataset.append(train)
         dev_dataset.append(dev)
@@ -149,6 +151,9 @@ def main(**kwargs):
     freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
     exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_rerank.png")
 
+    if kwargs["translate_mode"] == "test":
+        kwargs["eval_lang"] = [kwargs["target_langs"]]
+        
     trainer = DocumentGroundedDialogRerankTrainer(
         model='DAMO_ConvAI/nlp_convai_ranking_pretrain', 
         train_dataset   = train_dataset.to_dict('records'),

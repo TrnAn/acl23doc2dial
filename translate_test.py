@@ -10,6 +10,7 @@ import json
 import logging
 from utils.preprocessing import get_args, LANG_TOKENS_DD
 from utils import preprocessing
+from itertools import chain
 from tqdm import tqdm
 tqdm.pandas()
 
@@ -22,19 +23,50 @@ iso_lang = {
     "en": "eng_Latn"
 }
 
+
+def _remove_lang_domain(input_string):
+    pattern = r'//.*?-'
+    result = re.sub(pattern, "// ", input_string)
+    return result
+
+
+def _split_list_strings(text):
+    pattern         = r'<last_turn>|<user>|<agent>'
+    modified_text   = re.split(pattern, text)
+    tags            = re.findall(pattern, text)
+
+    return modified_text[1:], tags
+
+
+def _replace_tags_back(text, tags):
+    all_queries = []
+    for tags_of_query in tags:
+        query_w_tags = [f"{tag} {text.pop(0)}" for tag in tags_of_query]
+        all_queries.append(" ".join(query_w_tags))
+
+    return all_queries
+
+
 def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:int=256, lang_token:bool=False):
     tokenizer   = NllbTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang=iso_lang[source_lang])
     tokenize    = lambda x: tokenizer(x, return_tensors="pt",  padding=True, truncation=True).to(model.device)
+
     df_translate = df.copy()
     
     with torch.no_grad():
         for colname in colnames:
-            dataset     = df[colname].values.tolist()
+
+            if colname == "query":
+                queries, role_tags = zip(*df_translate[colname].apply(_split_list_strings))
+                queries = list(chain.from_iterable(queries))
+            else:
+                queries = df_translate[colname].tolist()
+
             data_loader = DataLoader(
-                dataset, 
+                dataset=queries, 
                 batch_size=batch_size, 
                 shuffle=False, 
-                num_workers=4, 
+                num_workers=2, 
                 pin_memory=True
                 )
             
@@ -44,12 +76,19 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:in
                 translated_tokens   = model.generate(**inputs, forced_bos_token_id=tokenizer.lang_code_to_id[iso_lang[target_lang]], max_length=256)
                 translated_query    += tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
 
-            df_translate[colname] = [(f"{LANG_TOKENS_DD[target_lang]} " if lang_token else '') + q.replace(f"{LANG_TOKENS_DD[source_lang]} ", '') for q in translated_query]
+
+            if colname == "query":
+                translated_query = _replace_tags_back(text=translated_query, tags=role_tags)  # ' '.join(f"{x} {y}" for x, y in zip(tag, translated_query))
+
+            translated_query = [(f"{LANG_TOKENS_DD[target_lang]} " if lang_token else '') + q.replace(f"{LANG_TOKENS_DD[source_lang]} ", '') for q in translated_query]
+            translated_query = [_remove_lang_domain(query) for query in translated_query]
+  
+            df_translate[colname] = translated_query
 
     return df_translate
 
 
-def translate_passages(passage_col:pd.Series, all_passages:list,  source_lang:str, target_lang:str, batch_size:int=256, lang_token:bool=False):
+def translate_passages(passage_col:pd.Series, all_passages:list,  source_lang:str, target_lang:str, batch_size:int=128, lang_token:bool=False):
     tokenizer   = NllbTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang=iso_lang[source_lang])
     tokenize  = lambda x: tokenizer(x, return_tensors="pt",  padding=True, truncation=True).to(model.device)
     
@@ -74,6 +113,7 @@ def translate_passages(passage_col:pd.Series, all_passages:list,  source_lang:st
         for item in passage_col:
             translated_passage = passages_dict.get(item)
             translated_passage = (f"{LANG_TOKENS_DD[target_lang]} " if lang_token else '') + translated_passage.replace(f"{LANG_TOKENS_DD[source_lang]} ", '')
+            translated_passage = _remove_lang_domain(translated_passage)
             print(f"{translated_passage=}")
             tmp += [translated_passage]
 
@@ -128,7 +168,7 @@ def main(**kwargs):
 
     if train_dataset is None:
         return 0
-    
+
     target_lang = kwargs["target_langs"][0]
     for source_lang in kwargs["source_langs"]:
         logger.info(f'translate {source_lang} dataset to {target_lang=}')

@@ -25,7 +25,7 @@ def main(**kwargs):
         vi_train_dataset["lang"] = "vi" 
 
     if "en" in langs:
-        en_train_dataset = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
+        en_train_dataset = pd.read_json("en_train_dataset_retrieval_generation_hn.json", lines=True)
         en_train_dataset["lang"] = "en"
 
     if "cn" in langs:
@@ -65,6 +65,8 @@ def main(**kwargs):
     train_dataset, dev_dataset = [], []
     if kwargs["translate_mode"] == "test":
         langs = set(kwargs["target_langs"])
+        kwargs["eval_lang"] = [list(langs)]
+        
 
     for lang in langs:
         train, dev = lang_dd[lang]
@@ -106,8 +108,6 @@ def main(**kwargs):
     
     freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
     exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_retrieval.png")
-
-    print(f"{train_dataset.columns=}")
     
     print(f"{kwargs['add_n_hard_negatives']=}")
     train_dataset["negative"] = train_dataset.progress_apply(lambda x:  add_hard_negatives(
@@ -118,6 +118,7 @@ def main(**kwargs):
             n=kwargs["add_n_hard_negatives"]), 
         axis=1)
     
+    print(f"{dev_dataset.head(3)=}")
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=kwargs["cache_dir"])
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,

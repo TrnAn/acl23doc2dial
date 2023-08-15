@@ -86,6 +86,9 @@ def save_to_json(df:pd.DataFrame, export_cols:list, fname:str="dev.json", pdir:s
 
 
 def add_hard_negatives(query, positive, negative, corpus:list, n:int=0):
+    if n == 0:
+        return [negative]
+    
     corpus = list(set(corpus) -  set([positive, negative]))
     tokenized_corpus = [doc.lower().split(" ") for doc in corpus]
 
@@ -94,7 +97,6 @@ def add_hard_negatives(query, positive, negative, corpus:list, n:int=0):
     tokenized_query = query.lower().split(" ")
     top_n = bm25.get_top_n(tokenized_query, corpus, n=n)
 
-    print(f"{[positive] + [negative] + top_n}")
     return [negative] + top_n
 
 

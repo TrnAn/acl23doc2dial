@@ -18,13 +18,14 @@ def main(**kwargs):
 
     if kwargs["translate_mode"] == "test":
         retrieval_fnames = [f"ttest_{src_lang}2{kwargs['target_langs'][0]}.json" for src_lang in kwargs['source_langs']]
+        print(retrieval_fnames)
         retrieval_paths  = [os.path.join(kwargs["cache_dir"], retrieval_fname) for retrieval_fname in retrieval_fnames]
     else:
         retrieval_paths  = [f'{kwargs["cache_dir"]}/{kwargs["eval_input_file"]}']
 
     for idx, retrieval_path in enumerate(retrieval_paths):
         filemode = "w" if idx == 0 else "a"
-        with open(retrieval_path) as f_in:
+        with open(retrieval_path, encoding="utf-8") as f_in:
             with open(f'{kwargs["cache_dir"]}/input.jsonl', filemode) as f_out:
                 for line in f_in.readlines():
                     sample = json.loads(line)
@@ -33,6 +34,7 @@ def main(**kwargs):
     with open(f'{kwargs["cache_dir"]}/input.jsonl') as f:
         eval_dataset = [json.loads(line) for line in f.readlines()]
 
+    print(f"{eval_dataset}")
     # TODO: add translated vi -> en fr -> en to all_passages
     # replace native lang wth translations vi -> vi2en; fr -> fr2en
     # all_passages = []
