@@ -22,13 +22,13 @@ if __name__ == '__main__':
 
     pipeline_steps = {
         "train" :       {
-            "train_retrieval":      train_retrieval,
-            "train_rerank":         train_rerank, 
-            "train_generation":     train_generation
+            # "train_retrieval":      train_retrieval,
+            # "train_rerank":         train_rerank, 
+            # "train_generation":     train_generation
             },
         "inference" :   {
             "inference_retrieval":  inference_retrieval, 
-            "inference_rerank":     inference_rerank, 
+            # "inference_rerank":     inference_rerank, 
             }
     }
 
@@ -52,8 +52,6 @@ if __name__ == '__main__':
 
     # start infererence pipeline
     if not kwargs['only_train']:
-        # unique_langs = set(item for sublist in kwargs["source_lang"] for item in sublist)
-
         print("START INFERENCE...")
 
         for name, inference_step in tqdm(pipeline_steps['inference'].items()):
@@ -73,6 +71,6 @@ if __name__ == '__main__':
                 inference_step.main(**tmp)
 
         # infererence generation runs evaluation on all evaluation languaes at once
-        inference_generation.main(**kwargs)
+        # inference_generation.main(**kwargs)   
 
         print(f"finished inference...")
