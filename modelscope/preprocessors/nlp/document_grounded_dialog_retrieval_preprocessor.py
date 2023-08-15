@@ -57,14 +57,14 @@ class DocumentGroundedDialogRetrievalPreprocessor(Preprocessor):
                 query,
                 padding=True,
                 return_tensors='pt',
-                max_length=self.query_sequence_length,
+                max_length=256, #self.query_sequence_length,
                 truncation=True)
 
             context_tokenizer_outputs = self.tokenizer.batch_encode_plus(
                 positive + negative,
                 padding=True,
                 return_tensors='pt',
-                max_length=self.context_sequence_length,
+                max_length=256,
                 truncation=True)
 
             result = {

@@ -138,10 +138,9 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             for index, payload in enumerate(tqdm.tqdm(train_loader)):
                 query, positive, negative, _ = payload
 
-                print(f"before removing duplicates/FN: {len(negative)=}")
-                negative = list(set(negative)- set(positive))
-                print(f"after removing duplicates/FN: {len(negative)=}")
-
+                # print(f"before removing duplicates/FN: {len(negative)=}")
+                # negative = list(filter(lambda x: x not in positive, negative))
+                # print(f"after removing duplicates/FN: {len(negative)=}")
                 processed = self.preprocessor(
                     {
                         'query': query,
@@ -150,7 +149,6 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     },
                     invoke_mode=ModeKeys.TRAIN)
                 
-
                 loss, logits = self.model.forward(processed)
 
                 loss = loss / accumulation_steps
@@ -221,14 +219,17 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             faiss_index = faiss.IndexFlatIP(all_ctx_vector.shape[-1])
             faiss_index.add(all_ctx_vector) # context -> passages
 
-            logger.info(f"save passage embeddings to: {self.model.model_dir}/passage_embeddings.txt...")
+            unique_langs = set(item for sublist in self.eval_lang for item in sublist) 
+            logger.info(f"save passage embeddings to: {self.model.model_dir}/passage_embeddings_{'_'.join(unique_langs)}.txt...")
             passage_df = pd.DataFrame({"passage": all_passages, "embedding": all_ctx_vector.tolist()})
-            passage_df.to_csv(f'{self.model.model_dir}/passage_embeddings.csv', index=False)
+            passage_df.to_csv(f'{self.model.model_dir}/passage_embeddings_{"_".join(unique_langs)}.csv', index=False)
             logger.info("done")
 
+        
             self.retrieval_results = {}
             all_meters = {}
             for idx, lang in enumerate(self.eval_lang):
+                print(f"{lang=}")
                 results = {'outputs': [], 'targets': []}
                 valid_loader = DataLoader(
                     dataset=self.eval_dataset,
