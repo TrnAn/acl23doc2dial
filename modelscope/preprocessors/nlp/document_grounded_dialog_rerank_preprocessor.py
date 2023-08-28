@@ -38,8 +38,11 @@ class DocumentGroundedDialogRerankPreprocessor(Preprocessor):
                 '<last_turn>', '<user>', '<agent>', '<response>', '<passage>'
             ]
             self.tokenizer.add_tokens(special_tokens)
+
         if kwargs["lang_token"]:
-            self.tokenizer.add_tokens(LANG_TOKENS_DD.values())
+            # self.tokenizer.add_tokens(LANG_TOKENS_DD.values())
+            self.tokenizer.add_special_tokens({"additional_special_tokens": LANG_TOKENS_DD.values()})
+
 
     @type_assert(object, Dict)
     def __call__(self, data: Dict[str, Any],

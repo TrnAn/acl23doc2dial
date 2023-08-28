@@ -31,13 +31,14 @@ class DocumentGroundedDialogRetrievalPreprocessor(Preprocessor):
         self.device = 'cuda' \
             if ('device' not in kwargs or kwargs['device'] == 'gpu') and torch.cuda.is_available() \
             else 'cpu'
-        self.query_sequence_length = self.config['query_sequence_length']
-        self.context_sequence_length = self.config['context_sequence_length']
+        self.query_sequence_length      = self.config['query_sequence_length']
+        self.context_sequence_length    = self.config['context_sequence_length']
         self.tokenizer = XLMRobertaTokenizer.from_pretrained(
             os.path.join(self.model_dir))
         
         if kwargs["lang_token"]:
-            self.tokenizer.add_tokens(LANG_TOKENS_DD.values())
+            # self.tokenizer.add_tokens(LANG_TOKENS_DD.values())
+            self.tokenizer.add_special_tokens({"additional_special_tokens": LANG_TOKENS_DD.values()})
 
         self.token_length = len(self.tokenizer)
 

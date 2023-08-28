@@ -244,7 +244,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             self.retrieval_results = {}
             all_meters = {}
             for idx, lang in enumerate(self.eval_lang):
-                results = {'outputs': [], 'targets': []}
+                results = {'queries': [], 'langs': [], 'outputs': [], 'targets': []}
                 valid_loader = DataLoader(
                     dataset=self.eval_dataset,
                     batch_size=per_gpu_batch_size,
@@ -265,10 +265,12 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                         processed).detach().cpu().numpy().astype('float32')
 
                     D, Index = faiss_index.search(query_vector, 20)
-                    results['outputs'] += [[
+                    results['outputs']  += [[
                         self.eval_passages[x] for x in retrieved_ids
                     ] for retrieved_ids in Index.tolist()]
-                    results['targets'] += positive
+                    results['targets']  += positive
+                    results['queries']  += query
+                    results['langs']    += curr_lang
 
                 meters = measure_result(results)
 
