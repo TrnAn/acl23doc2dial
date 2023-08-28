@@ -162,7 +162,6 @@ def measure_result(result_dict):
 class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
 
     def __init__(self, model: str, revision='v1.0.0', *args, **kwargs):
-
         self.model = Model.from_pretrained(model, revision=revision)
 
         # SWAP MT5MODEL WITH T5MODEL
@@ -180,6 +179,11 @@ class DocumentGroundedDialogGenerateTrainer(EpochBasedTrainer):
         # if kwargs["lang_token"] is not None:
         self.model.model.rerank.encoder.resize_token_embeddings(self.preprocessor.token_length)
 
+        checkpoint_path = os.path.join(self.model.model_dir, 'finetuned_model.bin')
+        if os.path.exists(checkpoint_path):
+            state_dict = torch.load(checkpoint_path)
+            self.model.model.load_state_dict(state_dict)
+            
         self.model.model.to(self.device)
         self.train_dataset = kwargs['train_dataset']
         self.eval_dataset = kwargs['eval_dataset']

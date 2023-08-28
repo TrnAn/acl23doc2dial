@@ -57,11 +57,51 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
         self.inst_id2pos_passages = dict()
         self.train_dataset = train_dataset
         self.dev_dataset = eval_dataset
-        print(model)
+
+        # model_dir = f'./{args["cache_dir"]}/output'
+        # if os.path.isdir(model_fdir): 
+        #     logger.info(f"load model: {model_dir=}")
+            # model_configuration = {
+            #     "framework": "pytorch",
+            #     "task": "document-grounded-dialog-rerank",
+            #     "model": {
+            #         "type": "doc2bot"
+            #     },
+            #     "pipeline": {
+            #         "type": "document-grounded-dialog-rerank"
+            #     },
+            #     "preprocessor": {
+            #         "type": "document-grounded-dialog-rerank"
+            #     }
+            # }
+
+            # file_out = open(f'{model_dir}/configuration.json', 'w')
+            # json.dump(model_configuration, file_out, indent=4)
+            # file_out.close()
+            # args.update({
+            #     'output': model_dir,
+            #     'max_batch_size': 64,
+            #     'exclude_instances': '',
+            #     'include_passages': True, #False,
+            #     'do_lower_case': True,
+            #     'max_seq_length': 512,
+            #     'query_length': 195,
+            #     'tokenizer_resize': True,
+            #     'model_resize': True,
+            #     'kilt_data': True
+            # })
+
+            # model = Model.from_pretrained(model_dir, **args)
+            # self.preprocessor= DocumentGroundedDialogRerankPreprocessor(
+            #     model.model_dir, **args)
+        # else:
         self.model = Model.from_pretrained(model, revision='v1.0.0', cache_dir=args["cache_dir"])
         summary(self.model)
+
         self.preprocessor = DocumentGroundedDialogRerankPreprocessor(
             self.model.model_dir, **args)
+        #### @TODO END ELSE
+
         self.tokenizer = self.preprocessor.tokenizer
         if args['model_resize'] or args['lang_token']:
             self.model.resize_token_embeddings(len(self.tokenizer))

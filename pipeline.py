@@ -22,13 +22,14 @@ if __name__ == '__main__':
 
     pipeline_steps = {
         "train" :       {
-            # "train_retrieval":      train_retrieval,
-            # "train_rerank":         train_rerank, 
-            # "train_generation":     train_generation
+            "train_retrieval":      train_retrieval,
+            "train_rerank":         train_rerank, 
+            "train_generation":     train_generation
             },
         "inference" :   {
             "inference_retrieval":  inference_retrieval, 
-            # "inference_rerank":     inference_rerank, 
+            "inference_rerank":     inference_rerank, 
+            "inference_generation": inference_generation
             }
     }
 
@@ -56,21 +57,13 @@ if __name__ == '__main__':
 
         for name, inference_step in tqdm(pipeline_steps['inference'].items()):
             print(f"start {name} step...")
-                
-            for idx, lang in enumerate(kwargs['eval_lang']):
-                tmp = kwargs.copy()
-                tmp["save_output"]  = 1 if idx == 0 else 0
-                tmp["eval_lang"]    = [lang]
 
-                if kwargs["translate_mode"] == "test":
-                    step_name = re.search(r"inference_(.*)", name).group(1)
-                    tmp[f"{step_name}_step"] = True
-                    print("is test")
-                    translate_test.main(**tmp)
+            if kwargs["translate_mode"] == "test":
+                step_name = re.search(r"inference_(.*)", name).group(1)
+                tmp[f"{step_name}_step"] = True
+                print("start test mode...")
+                translate_test.main(**tmp)
 
-                inference_step.main(**tmp)
-
-        # infererence generation runs evaluation on all evaluation languaes at once
-        # inference_generation.main(**kwargs)   
+            inference_step.main(**kwargs)
 
         print(f"finished inference...")

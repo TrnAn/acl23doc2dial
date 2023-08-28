@@ -72,6 +72,9 @@ def measure_result(result_dict):
     
     for output, target in zip(result_dict['outputs'], result_dict['targets']):
         for k in recall_k:
+            # print(f"{target=}")
+            # print(f"{output[:k]=}")
+
             if target in output[:k]:
                 meters[f'R@{k}'].append(1)
             else:
@@ -87,6 +90,9 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
 
     def __init__(self, model: str, revision='v1.0.0', *args, **kwargs):
         self.model = Model.from_pretrained(model, revision=revision)
+        
+        self.checkpoint_path = self.model.model_dir
+ 
         print(summary(self.model.model))
         self.preprocessor = DocumentGroundedDialogRetrievalPreprocessor(
             model_dir=self.model.model_dir, lang_token=kwargs["lang_token"])
@@ -96,12 +102,24 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             self.model.model.qry_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize query encoder of DPR model
             self.model.model.ctx_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize context encoder of DPR model
 
+        print(f"{self.checkpoint_path=}")
+
+        model_fdir = os.path.join(self.model.model_dir,
+                                          'finetuned_model.bin')
+
+        if os.path.exists(model_fdir): 
+            logger.info(f"load model: {model_fdir=}")
+            state_dict = torch.load(model_fdir)
+            self.model.model.load_state_dict(state_dict)
+
+
         self.model.model.to(self.device)
         self.train_dataset  = kwargs['train_dataset']
         self.eval_dataset   = kwargs['eval_dataset']
         self.all_passages   = kwargs['all_passages']
         self.eval_passages  = kwargs["eval_passages"]
         self.save_output    = kwargs['save_output']
+
 
     def train(self,
               total_epoches=20,
@@ -188,14 +206,13 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     (epoch, total_score, model_path))
                 
 
-    def evaluate(self, per_gpu_batch_size=32, checkpoint_path=None):
+    def evaluate(self, per_gpu_batch_size=32):
         """
         Evaluate testsets
         """
 
-        if checkpoint_path is not None:
-            state_dict = torch.load(checkpoint_path)
-            self.model.model.load_state_dict(state_dict)
+        # state_dict = torch.load(os.path.join(self.model.model_dir, "finetuned_model.bin"))
+        # self.model.model.load_state_dict(state_dict)
 
         self.model.model.eval()
         with torch.no_grad():
@@ -223,13 +240,10 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             logger.info(f"save passage embeddings to: {self.model.model_dir}/passage_embeddings_{'_'.join(unique_langs)}.txt...")
             passage_df = pd.DataFrame({"passage": all_passages, "embedding": all_ctx_vector.tolist()})
             passage_df.to_csv(f'{self.model.model_dir}/passage_embeddings_{"_".join(unique_langs)}.csv', index=False)
-            logger.info("done")
 
-        
             self.retrieval_results = {}
             all_meters = {}
             for idx, lang in enumerate(self.eval_lang):
-                print(f"{lang=}")
                 results = {'outputs': [], 'targets': []}
                 valid_loader = DataLoader(
                     dataset=self.eval_dataset,
@@ -261,17 +275,122 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 logger.info(f"{'_'.join(lang)} - {meters}")
                 
                 #(lang == self.eval_lang[0] and len(self.eval_lang) > 1) or 
-                if self.save_output:
-                    result_path = os.path.join(self.model.model_dir,
-                        f'evaluate_result.json')
-                    logger.info(f"saving evaluate_result.json...")
+                # if self.save_output:
+                #     result_path = os.path.join(self.model.model_dir,
+                #         f'evaluate_result.json')
+                #     logger.info(f"saving evaluate_result.json...")
 
-                    with open(result_path, 'w') as f:
-                        json.dump(results, f, ensure_ascii=False, indent=4)
+                #     with open(result_path, 'w') as f:
+                #         json.dump(results, f, ensure_ascii=False, indent=4)
 
                 all_meters["_".join(lang)] = meters
-                logger.info(f"{all_meters=}")
+
+            logger.info(f"{all_meters=}")
+
         return all_meters
+
+
+    def evaluate_by_domain(self, trainer, per_gpu_batch_size=32):
+            
+            def collate_retrieval(batch):
+                query   = [item['query']    for item in batch]
+                positive = [item['positive']  for item in batch]
+                labels  = [item['domain']   for item in batch]
+                langs   = [item['lang']    for item in batch]
+
+                return query, positive, labels, langs
+            
+            """
+            Evaluate testsets
+            """
+
+            trainer.model.eval()
+            self.model.model.eval()
+            with torch.no_grad():
+                all_meters = {}
+                for idx, lang in enumerate(self.eval_lang):
+                    save_output = True if idx == 0 else False
+                    
+                    results = {'outputs': [], 'targets': []}
+                    
+                    for domain in trainer.model.labels:
+                        results_domain = {'outputs': [], 'targets': []}
+                        logger.info(f"evaluate domain: {domain} for {', '.join(lang)}")
+                        
+                        domain_queries, domain_passages = trainer.predict(
+                            dataset=self.eval_dataset, 
+                            filter_domain=domain, 
+                            all_passages=self.eval_passages, 
+                            per_gpu_batch_size=128)
+                        
+                        valid_loader = DataLoader(
+                        dataset=domain_queries,
+                        num_workers=4,
+                        pin_memory=True,
+                        batch_size=per_gpu_batch_size,
+                        collate_fn=collate_retrieval)
+        
+                        domain_ctx_vector = []
+                        for mini_batch in range(0, len(domain_passages), per_gpu_batch_size):
+                            context = domain_passages[mini_batch:mini_batch
+                                                        + per_gpu_batch_size]
+                            processed = \
+                                self.preprocessor({'context': context},
+                                                invoke_mode=ModeKeys.INFERENCE,
+                                                input_type='context')
+                            sub_ctx_vector = self.model.encode_context(
+                                processed).detach().cpu().numpy()
+                            domain_ctx_vector.append(sub_ctx_vector)
+
+                        domain_ctx_vector = np.concatenate(domain_ctx_vector, axis=0)
+                        domain_ctx_vector = np.array(domain_ctx_vector).astype('float32')
+                        faiss_index = faiss.IndexFlatIP(domain_ctx_vector.shape[-1])
+                        faiss_index.add(domain_ctx_vector) # context -> passages
+
+                        for payload in tqdm.tqdm(valid_loader):
+                            queries, positives, domains, curr_langs = payload
+
+                            if not bool(set(lang) & set(curr_langs)): # language is not in current batch
+                                continue
+
+                            processed = self.preprocessor({'query': queries},
+                                                        invoke_mode=ModeKeys.INFERENCE)
+                            query_vector = self.model.encode_query(
+                                processed).detach().cpu().numpy().astype('float32')
+                            D, Index = faiss_index.search(query_vector, 20)
+                            
+                            results_domain['outputs'] += [[
+                                domain_passages[x] for x in retrieved_ids
+                            ] for retrieved_ids in Index.tolist()]
+                            results_domain['targets'] += positives
+                            # print(f"{results_domain['outputs'][-1][0]=} = {positives[-1]=}")
+
+
+                        if results_domain['outputs']:
+                            meters = measure_result(results_domain)
+                            logger.info(f"{'_'.join(lang+[domain])} - {meters}")
+
+                            results["outputs"] += results_domain['outputs']
+                            results["targets"] += results_domain['targets']
+
+                            # result_path = os.path.join(self.model.model_dir, f'evaluate_result_{domain}.json')
+                            # with open(result_path, 'w') as f:
+                            #     logger.info(f"saving evaluate_result_{domain}.json...")
+                            #     json.dump(results_domain, f, ensure_ascii=False, indent=4)
+
+                    meters = measure_result(results)
+                    if save_output:
+                        result_path = os.path.join(self.model.model_dir,
+                            f'evaluate_result.json')
+                        logger.info(f"saving evaluate_result.json...")
+
+                        with open(result_path, 'w') as f:
+                            json.dump(results, f, ensure_ascii=False, indent=4)
+
+                    all_meters["_".join(lang)] = meters
+                    logger.info(f"final result: {all_meters=}")
+
+            return all_meters
 
 
     def save_dataset(self, dataset: Union[list, Dict[str, Any]],  per_gpu_batch_size=32, fname:str="rerank_dataset.json"):
