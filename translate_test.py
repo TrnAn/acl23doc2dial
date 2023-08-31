@@ -24,14 +24,14 @@ iso_lang = {
 }
 
 
-def _remove_lang_domain(input_string):
+def _remove_lang_domain(input_string, target_lang):
     pattern = r'//.*?-'
-    result = re.sub(pattern, "// ", input_string)
+    result = re.sub(pattern, f"// {target_lang}-", input_string)
     return result
 
 
 def _split_list_strings(text):
-    pattern         = r'<last_turn>|<user>|<agent>'
+    pattern         = r'<last_turn>|<user>|<agent>|<response>'
     modified_text   = re.split(pattern, text)
     tags            = re.findall(pattern, text)
 
@@ -55,7 +55,7 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:in
     
     with torch.no_grad():
         for colname in colnames:
-
+            df_translate[colname] = df_translate[colname].apply(lambda x: re.sub(r'<fr>\s*|<vi>\s*|<en>\s*', '', x))
             if colname == "query":
                 queries, role_tags = zip(*df_translate[colname].apply(_split_list_strings))
                 queries = list(chain.from_iterable(queries))
@@ -81,7 +81,7 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:in
                 translated_query = _replace_tags_back(text=translated_query, tags=role_tags)  # ' '.join(f"{x} {y}" for x, y in zip(tag, translated_query))
 
             translated_query = [(f"{LANG_TOKENS_DD[target_lang]} " if lang_token else '') + q.replace(f"{LANG_TOKENS_DD[source_lang]} ", '') for q in translated_query]
-            translated_query = [_remove_lang_domain(query) for query in translated_query]
+            translated_query = [_remove_lang_domain(query, target_lang) for query in translated_query]
   
             df_translate[colname] = translated_query
 
@@ -91,7 +91,8 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:in
 def translate_passages(passage_col:pd.Series, all_passages:list,  source_lang:str, target_lang:str, batch_size:int=128, lang_token:bool=False):
     tokenizer   = NllbTokenizer.from_pretrained("facebook/nllb-200-distilled-600M", src_lang=iso_lang[source_lang])
     tokenize  = lambda x: tokenizer(x, return_tensors="pt",  padding=True, truncation=True).to(model.device)
-    
+
+    all_passages = [re.sub(r'<fr>\s*|<vi>\s*|<en>\s*', '', x) for x in all_passages]
     with torch.no_grad():
         data_loader = DataLoader(
             dataset=all_passages, 
@@ -111,9 +112,9 @@ def translate_passages(passage_col:pd.Series, all_passages:list,  source_lang:st
 
         tmp = []
         for item in passage_col:
-            translated_passage = passages_dict.get(item)
-            translated_passage = (f"{LANG_TOKENS_DD[target_lang]} " if lang_token else '') + translated_passage.replace(f"{LANG_TOKENS_DD[source_lang]} ", '')
-            translated_passage = _remove_lang_domain(translated_passage)
+            translated_passage = passages_dict.get(re.sub(r'<fr>\s*|<vi>\s*|<en>\s*', '', item))
+            translated_passage = (f"{LANG_TOKENS_DD[target_lang]} " if lang_token else '') + translated_passage
+            translated_passage = _remove_lang_domain(translated_passage, target_lang)
             print(f"{translated_passage=}")
             tmp += [translated_passage]
 
@@ -177,7 +178,7 @@ def main(**kwargs):
         retrieval_path  = os.path.join(kwargs["cache_dir"], retrieval_fname)
         
         if kwargs["retrieval_step"] and not os.path.exists(retrieval_path):
-            retrieval_translated_df         = translate(df=train_dataset[train_dataset['lang'] == source_lang], colnames=["query", "positive", "negative"], source_lang=source_lang, target_lang=target_lang, lang_token=kwargs["lang_token"])
+            retrieval_translated_df         = translate(df=train_dataset[train_dataset['lang'] == source_lang], colnames=["query", "positive", "response"], source_lang=source_lang, target_lang=target_lang, lang_token=kwargs["lang_token"])
             retrieval_translated_df["lang"] = source_lang
             save_all_passages(source_lang=source_lang, target_lang=target_lang, lang_token=kwargs["lang_token"], cache_dir=kwargs["cache_dir"])
 

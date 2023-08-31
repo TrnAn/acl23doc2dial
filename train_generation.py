@@ -362,7 +362,7 @@ def main(**kwargs):
     train_dataset_fr, train_dataset_vi, train_dataset_en, train_dataset_cn = None, None, None, None
     retrieval_data = []
     # langs = set(item for sublist in kwargs["eval_lang"] for item in sublist) 
-    langs = set(kwargs["target_langs"]) if kwargs["translate_mode"] == "test" else set(item for sublist in kwargs["eval_lang"] for item in sublist) 
+    langs = set(kwargs["target_langs"] + kwargs["source_langs"]) if kwargs["translate_mode"] == "test" else set(item for sublist in kwargs["eval_lang"] for item in sublist) 
     if "en" in langs:
         # train_dataset_en = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
         train_dataset_en = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_ranking_pretrain/en_{kwargs['extended_generation_dataset_fname']}")
@@ -378,16 +378,18 @@ def main(**kwargs):
         
     if "fr" in langs:
         train_dataset_fr = preprocessing.read('DAMO_ConvAI/FrDoc2BotGeneration')
-        fr_retrieval = preprocessing.read('DAMO_ConvAI/FrDoc2BotRetrieval')
-        retrieval_data += [fr_retrieval]
         train_dataset_fr["lang"] = "fr"
 
     if "vi" in langs:
-        train_dataset_vi = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')
-        vi_retrieval = preprocessing.read('DAMO_ConvAI/ViDoc2BotRetrieval')
+        train_dataset_vi = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')    
         train_dataset_vi["lang"] = "vi"
-        retrieval_data += [vi_retrieval]
+        
 
+    fr_retrieval = preprocessing.read('DAMO_ConvAI/FrDoc2BotRetrieval')
+    retrieval_data += [fr_retrieval]
+    vi_retrieval = preprocessing.read('DAMO_ConvAI/ViDoc2BotRetrieval')
+    retrieval_data += [vi_retrieval]
+    
     train_dataset_vi, dev_dataset_vi = preprocessing.test_split(train_dataset_vi, random_state=SEED)
     train_dataset_fr, dev_dataset_fr = preprocessing.test_split(train_dataset_fr, random_state=SEED)
 
@@ -422,9 +424,8 @@ def main(**kwargs):
         "cn": (train_dataset_cn, dev_dataset_cn)
     }
 
-
     train_dataset, dev_dataset = [], []
-    for lang in langs:
+    for lang in set(kwargs["target_langs"]):
         train_tmp, dev_tmp = lang_dd[lang]
         train_dataset.append(train_tmp)
         dev_dataset.append(dev_tmp)
@@ -445,11 +446,19 @@ def main(**kwargs):
     preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname="test.json", pdir=kwargs["cache_dir"])
 
     dev_dataset_copy = dev_dataset.copy()
-    
+    if kwargs["translate_mode"] == "test":
+        dev_data = []
+        for eval_lang in kwargs["source_langs"]:
+            print(f"{eval_lang=}")
+            _, dev_tmp = lang_dd[eval_lang]
+            print(f"{dev_tmp.head(1)=}")
+            dev_data.append(dev_tmp)
+        print(dev_data)
+        dev_dataset_copy = pd.concat(dev_data)
+
     dev_dataset_copy = dev_dataset_copy.merge(pd.concat(retrieval_data), how='inner', left_on='query', right_on='query')
     print(f"{dev_dataset_copy.head(1)=}")
     preprocessing.save_to_json(dev_dataset_copy, ['query', 'positive', 'response', 'lang'] , fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
-    return
 
     freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
     exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_generation.png")
@@ -474,7 +483,7 @@ def main(**kwargs):
     print(f"BATCH SIZE: {kwargs['per_gpu_batch_size']}")
 
     print(f"{kwargs['eval_lang']=}")
-    train(trainer, eval_lang=kwargs["eval_lang"], batch_size=kwargs["per_gpu_batch_size"], accumulation_steps=kwargs["gradient_accumulation_steps"], total_epoches=10-2, learning_rate=1e-4, loss_log_freq=1, is_translate_test=True if kwargs["translate_mode"] == "test" else False)
+    train(trainer, eval_lang=kwargs["eval_lang"], batch_size=kwargs["per_gpu_batch_size"], accumulation_steps=kwargs["gradient_accumulation_steps"], total_epoches=10, learning_rate=1e-4, loss_log_freq=1, is_translate_test=True if kwargs["translate_mode"] == "test" else False)
     evaluate(trainer, eval_lang=kwargs["eval_lang"], length_penalty=kwargs["length_penalty"])
     # checkpoint_path=os.path.join(trainer.model.model_dir,
                                                 #    'finetuned_model.bin')

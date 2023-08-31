@@ -22,8 +22,8 @@ if __name__ == '__main__':
 
     pipeline_steps = {
         "train" :       {
-            # "train_retrieval":      train_retrieval,
-            # "train_rerank":         train_rerank, 
+            "train_retrieval":      train_retrieval,
+            "train_rerank":         train_rerank, 
             "train_generation":     train_generation
             },
         "inference" :   {
@@ -59,6 +59,7 @@ if __name__ == '__main__':
             print(f"start {name} step...")
 
             if kwargs["translate_mode"] == "test":
+                tmp = kwargs.copy()
                 step_name = re.search(r"inference_(.*)", name).group(1)
                 tmp[f"{step_name}_step"] = True
                 print("start test mode...")
