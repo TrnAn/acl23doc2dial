@@ -16,8 +16,7 @@ logger = get_logger()
 
 LANG_TOKENS = {"fr": "<fr>",
                "vi": "<vi>",
-               "en": "<en>",
-               "cn": "<cn>"}
+               "en": "<en>"}
 
 LANG_TOKENS_DD = defaultdict(lambda: "<unk>", LANG_TOKENS)
 
@@ -126,7 +125,10 @@ def get_args():
     parser.add_argument("--is-inference", help= "is inference pipeline step", action=argparse.BooleanOptionalAction)
     parser.add_argument("--equal-dataset-size", help= "Set all datasets to comparable dataset sizes", type=int, default=0) 
     parser.add_argument("--add-n-hard-negatives", help= "Set number of hard negatives to add to existing negative passages", type=int, default=0) 
-
+    parser.add_argument("--retrieval-epoch", help= "Number of epochs for retrieval", type=int, default=50) 
+    parser.add_argument("--rerank-epoch", help= "Number of epochs for rerank", type=int, default=10)
+    parser.add_argument("--generation-epoch", help= "Number of epochs for generation", type=int, default=10)
+    parser.add_argument("--length-penalty", help= "Number of epochs for generation", type=int, default=1)
     args, _ = parser.parse_known_args()
 
     return vars(args)
