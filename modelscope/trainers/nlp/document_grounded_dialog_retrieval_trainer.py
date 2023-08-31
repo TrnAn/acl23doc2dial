@@ -29,9 +29,9 @@ def collate(batch):
     positive = [item['positive'] for item in batch]
     # negative = [item['negative'] for item in batch]
     negative = np.array([item['negative'] for item in batch]).ravel().tolist()
-
+    response = [item['response'] for item in batch]
     lang = [item['lang'] for item in batch]
-    return query, positive, negative, lang
+    return query, positive, negative, response, lang
 
 
 def prepare_optimizer(model, lr, weight_decay, eps):
@@ -72,9 +72,6 @@ def measure_result(result_dict):
     
     for output, target in zip(result_dict['outputs'], result_dict['targets']):
         for k in recall_k:
-            # print(f"{target=}")
-            # print(f"{output[:k]=}")
-
             if target in output[:k]:
                 meters[f'R@{k}'].append(1)
             else:
@@ -154,7 +151,7 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             self.model.model.train()
             losses = []
             for index, payload in enumerate(tqdm.tqdm(train_loader)):
-                query, positive, negative, _ = payload
+                query, positive, negative, _, _ = payload
 
                 # print(f"before removing duplicates/FN: {len(negative)=}")
                 # negative = list(filter(lambda x: x not in positive, negative))
@@ -244,13 +241,15 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
             self.retrieval_results = {}
             all_meters = {}
             for idx, lang in enumerate(self.eval_lang):
-                results = {'queries': [], 'langs': [], 'outputs': [], 'targets': []}
+                save_output = True if idx == 0 else False
+                
+                results = {'queries': [], 'response': [], 'langs': [], 'outputs': [], 'targets': []}
                 valid_loader = DataLoader(
                     dataset=self.eval_dataset,
                     batch_size=per_gpu_batch_size,
                     collate_fn=collate)
                 for payload in tqdm.tqdm(valid_loader):
-                    query, positive, negative, curr_lang = payload
+                    query, positive, _, response, curr_lang = payload
 
                     if bool(set(curr_lang) & set(lang)) == 0: # language is not in current batch
                         continue
@@ -268,22 +267,25 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                     results['outputs']  += [[
                         self.eval_passages[x] for x in retrieved_ids
                     ] for retrieved_ids in Index.tolist()]
-                    results['targets']  += positive
-                    results['queries']  += query
-                    results['langs']    += curr_lang
+                    results['targets']      += positive
+                    results['queries']      += query
+                    results['response']     += response
+                    results['langs']        += curr_lang
 
                 meters = measure_result(results)
 
                 logger.info(f"{'_'.join(lang)} - {meters}")
                 
-                #(lang == self.eval_lang[0] and len(self.eval_lang) > 1) or 
-                # if self.save_output:
-                #     result_path = os.path.join(self.model.model_dir,
-                #         f'evaluate_result.json')
-                #     logger.info(f"saving evaluate_result.json...")
+                if save_output:
+                    result_path = os.path.join(self.model.model_dir,
+                        f'evaluate_result.json')
+                    logger.info(f"saving evaluate_result.json...")
 
-                #     with open(result_path, 'w') as f:
-                #         json.dump(results, f, ensure_ascii=False, indent=4)
+                    with open(result_path, 'w') as f:
+                        json.dump(results, f, ensure_ascii=False, indent=4)
+
+                all_meters["_".join(lang)] = meters
+                logger.info(f"final result: {all_meters=}")
 
                 all_meters["_".join(lang)] = meters
 

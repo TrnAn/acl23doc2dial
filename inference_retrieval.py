@@ -5,6 +5,7 @@ from modelscope.trainers.nlp.document_grounded_dialog_retrieval_trainer import \
 import datetime
 import argparse
 from utils.seed import set_seed
+import pandas as pd
 from utils.preprocessing import get_args, get_unique_langs, get_unique_passages
 set_seed()
 
@@ -18,7 +19,6 @@ def main(**kwargs):
 
     if kwargs["translate_mode"] == "test":
         retrieval_fnames = [f"ttest_{src_lang}2{kwargs['target_langs'][0]}.json" for src_lang in kwargs['source_langs']]
-        print(retrieval_fnames)
         retrieval_paths  = [os.path.join(kwargs["cache_dir"], retrieval_fname) for retrieval_fname in retrieval_fnames]
     else:
         retrieval_paths  = [f'{kwargs["cache_dir"]}/{kwargs["eval_input_file"]}']
@@ -34,7 +34,6 @@ def main(**kwargs):
     with open(f'{kwargs["cache_dir"]}/input.jsonl') as f:
         eval_dataset = [json.loads(line) for line in f.readlines()]
 
-    print(f"{eval_dataset}")
     # TODO: add translated vi -> en fr -> en to all_passages
     # replace native lang wth translations vi -> vi2en; fr -> fr2en
     # all_passages = []
@@ -63,13 +62,14 @@ def main(**kwargs):
                 all_passages += json.load(f)    
 
     # all_passages_w_translations =  list(set(all_passages) | set(translated_passages))
-
+    dev_dataset = pd.DataFrame(eval_dataset)
+    dev_dataset["negative"] = None
     # print(f"{all_passages_w_translations=}")
     cache_path = f'{kwargs["cache_dir"]}/DAMO_ConvAI/nlp_convai_retrieval_pretrain'
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
         train_dataset=None,
-        eval_dataset=eval_dataset,
+        eval_dataset=dev_dataset.to_dict('records'),
         all_passages=None,
         eval_passages=all_passages,
         lang_token=kwargs["lang_token"],
@@ -78,8 +78,9 @@ def main(**kwargs):
     )
 
     trainer.evaluate(
-        checkpoint_path=os.path.join(trainer.model.model_dir,
-                                    f'finetuned_model.bin'))
+        # checkpoint_path=os.path.join(trainer.model.model_dir,
+        #                             f'finetuned_model.bin')
+                                    )
 
 
 if __name__ == '__main__':

@@ -29,21 +29,21 @@ def main(**kwargs):
             # if sample["lang"] in kwargs["target_langs"]:
             for passage_dict in sample["passages"]:
                 id_to_passage[passage_dict["pid"]] = passage_dict["text"]
-        print(f"{id_to_passage}")
+
 
     eval_dataset = []
     with open(f'{kwargs["cache_dir"]}/rerank_output.jsonl', encoding="utf-8-sig") as f_in:
         for line in f_in.readlines():
             # 
             sample = json.loads(line)
-            if sample["lang"] not in langs:
+            if sample["langs"] not in langs:
                 continue
             eval_dataset.append({
                 'query': sample['input'],
                 'rerank': eval(json.dumps([id_to_passage[x['wikipedia_id']] for x in sample['output'][0]['provenance']],
                                     ensure_ascii=False)),
-                'response': sample['output'][0]['answer'], #'<response> @'
-                'lang': sample["lang"]
+                'response': sample["responses"], # sample['output'][0]['answer'], #'<response> @'
+                'lang': sample["langs"]
             })
     
     kwargs["is_inference"] = True

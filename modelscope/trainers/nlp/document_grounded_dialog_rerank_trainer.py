@@ -289,7 +289,6 @@ class DocumentGroundedDialogRerankTrainer(EpochBasedTrainer):
 
                     inst_id = jobj['id']
                     if inst_id not in self.inst_id2pos_pids:
-                        print(f"not there: {inst_id=}")
                         continue
                     if line_ndx % self.args['world_size'] != \
                             self.args['global_rank']:

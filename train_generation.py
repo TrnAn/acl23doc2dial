@@ -228,12 +228,12 @@ def train(trainer,
             ]
     
             input_ids = tokenizer.batch_encode_plus(
-                list(generator_inputs), padding=True,  max_length=2000, truncation=True, return_tensors='pt').input_ids.to(device)    
+                list(generator_inputs), padding=True,  max_length=512, truncation=True, return_tensors='pt', return_token_type_ids=False).input_ids.to(device)    
 
             # input_ids = tokenizer.batch_encode_plus(
             #     list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device)
             label_ids = tokenizer.batch_encode_plus(
-                list(label), padding=True, return_tensors='pt').input_ids.to(device)
+                list(label), padding=True, return_tensors='pt', return_token_type_ids=False).input_ids.to(device)
 
             loss = model(input_ids=input_ids, labels=label_ids)[0]
 
@@ -276,7 +276,7 @@ def train(trainer,
             
 
 
-def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
+def evaluate(trainer, eval_lang:list, batch_size=16, length_penalty=1, checkpoint_path=None):
     model = trainer.model.model.generator.generator
     tokenizer = trainer.preprocessor.generation_tokenizer
     device = trainer.preprocessor.device
@@ -329,7 +329,6 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
 
                 # outputs = model.generate(input_ids, num_beams=3, max_length=128, early_stopping=True,
                 #                         no_repeat_ngram_size=3)
-                length_penalty = 2
                 outputs = model.generate(
                     input_ids, 
                     num_beams=3, 
@@ -360,10 +359,8 @@ def evaluate(trainer, eval_lang:list, batch_size=16, checkpoint_path=None):
 
 
 def main(**kwargs):
-    torch.cuda.empty_cache()
-    torch.backends.cuda.cudnn_enabled = True
-
     train_dataset_fr, train_dataset_vi, train_dataset_en, train_dataset_cn = None, None, None, None
+    retrieval_data = []
     # langs = set(item for sublist in kwargs["eval_lang"] for item in sublist) 
     langs = set(kwargs["target_langs"]) if kwargs["translate_mode"] == "test" else set(item for sublist in kwargs["eval_lang"] for item in sublist) 
     if "en" in langs:
@@ -381,11 +378,15 @@ def main(**kwargs):
         
     if "fr" in langs:
         train_dataset_fr = preprocessing.read('DAMO_ConvAI/FrDoc2BotGeneration')
+        fr_retrieval = preprocessing.read('DAMO_ConvAI/FrDoc2BotRetrieval')
+        retrieval_data += [fr_retrieval]
         train_dataset_fr["lang"] = "fr"
 
     if "vi" in langs:
         train_dataset_vi = preprocessing.read('DAMO_ConvAI/ViDoc2BotGeneration')
+        vi_retrieval = preprocessing.read('DAMO_ConvAI/ViDoc2BotRetrieval')
         train_dataset_vi["lang"] = "vi"
+        retrieval_data += [vi_retrieval]
 
     train_dataset_vi, dev_dataset_vi = preprocessing.test_split(train_dataset_vi, random_state=SEED)
     train_dataset_fr, dev_dataset_fr = preprocessing.test_split(train_dataset_fr, random_state=SEED)
@@ -405,6 +406,8 @@ def main(**kwargs):
         train_dataset_vi      = preprocessing.add_lang_token(train_dataset_vi, "vi", ["query", "rerank"]) 
         train_dataset_en      = preprocessing.add_lang_token(train_dataset_en, "en", ["query", "rerank"]) 
         train_dataset_cn      = preprocessing.add_lang_token(train_dataset_cn, "cn", ["query", "rerank"]) 
+        fr_retrieval          = preprocessing.add_lang_token(fr_retrieval, "fr", ["query", "positive"])
+        vi_retrieval          = preprocessing.add_lang_token(vi_retrieval, "vi", ["query", "positive"])
 
         dev_dataset_fr = preprocessing.add_lang_token(dev_dataset_fr, "fr", ["query", "rerank"]) 
         dev_dataset_vi = preprocessing.add_lang_token(dev_dataset_vi, "vi", ["query", "rerank"]) 
@@ -418,6 +421,7 @@ def main(**kwargs):
         "en": (train_dataset_en, dev_dataset_en),
         "cn": (train_dataset_cn, dev_dataset_cn)
     }
+
 
     train_dataset, dev_dataset = [], []
     for lang in langs:
@@ -440,7 +444,13 @@ def main(**kwargs):
         raise Exception("Please specify arg --eval-input-file to read eval dataset from")
     preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname="test.json", pdir=kwargs["cache_dir"])
 
-  
+    dev_dataset_copy = dev_dataset.copy()
+    
+    dev_dataset_copy = dev_dataset_copy.merge(pd.concat(retrieval_data), how='inner', left_on='query', right_on='query')
+    print(f"{dev_dataset_copy.head(1)=}")
+    preprocessing.save_to_json(dev_dataset_copy, ['query', 'positive', 'response', 'lang'] , fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
+    return
+
     freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
     exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_generation.png")
 
@@ -464,9 +474,10 @@ def main(**kwargs):
     print(f"BATCH SIZE: {kwargs['per_gpu_batch_size']}")
 
     print(f"{kwargs['eval_lang']=}")
-    train(trainer, eval_lang=kwargs["eval_lang"], batch_size=kwargs["per_gpu_batch_size"], accumulation_steps=kwargs["gradient_accumulation_steps"], total_epoches=10, learning_rate=1e-4, loss_log_freq=1, is_translate_test=True if kwargs["translate_mode"] == "test" else False)
-    evaluate(trainer, eval_lang=kwargs["eval_lang"], checkpoint_path=os.path.join(trainer.model.model_dir,
-                                                   'finetuned_model.bin'))
+    train(trainer, eval_lang=kwargs["eval_lang"], batch_size=kwargs["per_gpu_batch_size"], accumulation_steps=kwargs["gradient_accumulation_steps"], total_epoches=10-2, learning_rate=1e-4, loss_log_freq=1, is_translate_test=True if kwargs["translate_mode"] == "test" else False)
+    evaluate(trainer, eval_lang=kwargs["eval_lang"], length_penalty=kwargs["length_penalty"])
+    # checkpoint_path=os.path.join(trainer.model.model_dir,
+                                                #    'finetuned_model.bin')
 
 
 if __name__ == '__main__':

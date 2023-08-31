@@ -72,11 +72,9 @@ def main(**kwargs):
         'model_resize': True,
         'kilt_data': True
     })
-
     
     langs = get_unique_langs(kwargs["eval_lang"])
-    print(f"{langs=}")
-    kwargs["eval_lang"] = kwargs["eval_lang"][0]
+    # kwargs["eval_lang"] = kwargs["eval_lang"][0]
 
     model = Model.from_pretrained(model_dir, **kwargs)
     mypreprocessor = DocumentGroundedDialogRerankPreprocessor(
@@ -85,32 +83,21 @@ def main(**kwargs):
     pipeline_ins = myDocumentGroundedDialogRerankPipeline(
         model=model, preprocessor=mypreprocessor, **kwargs)
 
-    file_in = open(f'./{kwargs["cache_dir"]}/input.jsonl', 'r', encoding="utf-8-sig")
-    all_querys = []
-    for every_query in file_in:
-        all_querys.append(json.loads(every_query))
-        
-    # passage_to_id = {}
-    # ptr = -1
-    # languages = ['fr', 'vi', 'en', 'cn'] if args["extended_dataset"] else ['fr', 'vi']
-    # for file_name in languages:
-    #     with open(f'./all_passages/{file_name}.json') as f:
-    #         all_passages = json.load(f)
-    #         if args["lang_token"]:
-    #             all_passages = [f"<{file_name}> " + passage for passage in all_passages]
-    #         for every_passage in all_passages:
-    #             ptr += 1
-    #             passage_to_id[every_passage] = str(ptr)
+    # file_in = open(f'./{kwargs["cache_dir"]}/input.jsonl', 'r', encoding="utf-8-sig")
+    # all_querys = []
+    # for every_query in file_in:
+    #     all_querys.append(json.loads(every_query))
 
     passage_to_id = {}
     ptr = -1
     parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
 
     # replace native lang wth translations vi -> vi2en; fr -> fr2en
-    # if kwargs["translate_mode"] in ["train", "test"]:
-    #     passage_langs =  kwargs["source_langs"] + kwargs["target_langs"]
-    # else:
-    #     passage_langs = langs
+    if kwargs["translate_mode"] in ["train", "test"]:
+        passage_langs =  kwargs["source_langs"] + kwargs["target_langs"]
+    else:
+        passage_langs = langs
+    
     
     passage_langs = ["fr", "vi", "en", "cn"]
     for file_name in passage_langs:
@@ -133,57 +120,73 @@ def main(**kwargs):
     with open(f'{kwargs["cache_dir"]}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/evaluate_result.json', encoding="utf-8-sig") as file_in:
         retrieval_file = json.load(file_in)
 
-    # print(f"{langs=}")
-    retrieval_result    = retrieval_file['outputs'] # predicted
-    retrieval_targets   = retrieval_file['targets']
-    input_list = []
-    passages_list = []
-    lang_list = []
-    ids_list = []
-    output_list = []
-    positive_pids_list = []
-    ptr = -1
+    for lang in kwargs["eval_lang"]:
+        print(f"{lang=}")
+        retrieval_result    = retrieval_file['outputs'] # predicted
+        retrieval_targets   = retrieval_file['targets']
+        queries             = retrieval_file['queries']
+        languages           = retrieval_file['langs']
+        responses           = retrieval_file['response']
+        input_list = []
+        passages_list = []
+        lang_list = []
+        ids_list = []
+        output_list = []
+        positive_pids_list = []
+        # ptr = -1
 
-    for x in tqdm(all_querys):
-        ptr += 1
-        now_id = str(ptr)
-        now_input = x
-        now_wikipedia = []
-        now_passages = []
+        # for ptr, x in tqdm(enumerate(all_querys)):
+        for idx, (query, language, all_candidates, target) in enumerate(zip(queries, languages, retrieval_result, retrieval_targets)):
+            # ptr += 1
+            # now_id = str(ptr)
+            # now_input = x
+            # now_positive = now_input["positive"]
+            now_wikipedia = []
+            now_passages = []
 
-        # print(f"{now_input['lang']=} ; {langs=}")
-        if now_input["lang"] not in langs:
-            continue
+            if language not in lang:
+                continue
+            
+            # retrieval_idx = retrieval_targets.index(now_positive)
         
-        all_candidates = retrieval_result[ptr]
-        target = retrieval_targets[ptr]
+            # all_candidates = retrieval_result[ptr]
+            # all_candidates = retrieval_result[retrieval_idx]
+            # target = retrieval_targets[ptr]
+            # target = retrieval_targets[retrieval_idx]
+            
+            
+            for every_passage in all_candidates:
+                get_pid = passage_to_id[every_passage.strip()]
+                get_positive_pid = passage_to_id[target.strip()]
+                now_wikipedia.append({'wikipedia_id': str(get_pid)})
+                now_passages.append({"pid": str(get_pid), "title": "", "text": every_passage})
+            now_output = [{'answer': target, 'provenance': now_wikipedia}]
+
+
+            input_list.append(query)
+            passages_list.append(str(now_passages))
+            ids_list.append(idx)
+            output_list.append(str(now_output))
+            lang_list.append(language)
+            positive_pids_list.append(json.dumps([get_positive_pid]))
+            
+            # input_list.append(now_input['query'])
+            # passages_list.append(str(now_passages))
+            # ids_list.append(now_id)
+            # output_list.append(str(now_output))
+            # lang_list.append(now_input["lang"])
+            # positive_pids_list.append(json.dumps([get_positive_pid]))
         
-        for every_passage in all_candidates:
-            get_pid = passage_to_id[every_passage.strip()]
-            get_positive_pid = passage_to_id[target.strip()]
-            now_wikipedia.append({'wikipedia_id': str(get_pid)})
-            now_passages.append({"pid": str(get_pid), "title": "", "text": every_passage})
-        now_output = [{'answer': target, 'provenance': now_wikipedia}]
 
-        input_list.append(now_input['query'])
-        passages_list.append(str(now_passages))
-        ids_list.append(now_id)
-        output_list.append(str(now_output))
-        lang_list.append(now_input["lang"])
-        # positive_pids_list.append(str([]))
-        positive_pids_list.append(json.dumps([get_positive_pid]))
-    
+        evaluate_dataset = {'input': input_list, 'id': ids_list, 'passages': passages_list, 'output': output_list,
+                            'positive_pids': positive_pids_list, 'langs': lang_list, 'responses': responses}
 
-    evaluate_dataset = {'input': input_list, 'id': ids_list, 'passages': passages_list, 'output': output_list,
-                        'positive_pids': positive_pids_list, 'lang': lang_list}
+        print(f"evaluation results on {', '.join(lang)}:")
+        pipeline_ins(evaluate_dataset)
 
-    print(f"evaluation results on {'_'.join(langs)} language set:")
-    pipeline_ins(evaluate_dataset)
-
-    print(f'{kwargs["save_output"]=}')
-    if kwargs["save_output"]:
-        print(f"save rerank_output.jsonl...")
-        pipeline_ins.save(f'./{kwargs["cache_dir"]}/rerank_output.jsonl')
+        if sorted(lang) == sorted(langs):
+            print(f"save rerank_output.jsonl for {lang=}...")
+            pipeline_ins.save(f'./{kwargs["cache_dir"]}/rerank_output.jsonl')
 
 
 if __name__ == '__main__':

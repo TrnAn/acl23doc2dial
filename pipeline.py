@@ -22,8 +22,8 @@ if __name__ == '__main__':
 
     pipeline_steps = {
         "train" :       {
-            "train_retrieval":      train_retrieval,
-            "train_rerank":         train_rerank, 
+            # "train_retrieval":      train_retrieval,
+            # "train_rerank":         train_rerank, 
             "train_generation":     train_generation
             },
         "inference" :   {

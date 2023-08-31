@@ -66,7 +66,9 @@ def main(**kwargs):
     if kwargs["translate_mode"] == "test":
         langs = set(kwargs["target_langs"])
         kwargs["eval_lang"] = [list(langs)]
-        
+    
+    if kwargs["translate_mode"] == "train":
+        langs = set(list(langs) + kwargs["source_langs"])
 
     for lang in langs:
         train, dev = lang_dd[lang]
@@ -92,7 +94,7 @@ def main(**kwargs):
         dev_dataset         = preprocessing.get_equal_dataset_size_by_lang(dev_dataset)
         save_dev_dataset    = preprocessing.get_equal_dataset_size_by_lang(save_dev_dataset)
 
-    preprocessing.save_to_json(save_dev_dataset, save_dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
+    # preprocessing.save_to_json(save_dev_dataset, save_dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
 
     parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
     all_passages = []
@@ -118,7 +120,9 @@ def main(**kwargs):
             n=kwargs["add_n_hard_negatives"]), 
         axis=1)
     
-    print(f"{dev_dataset.head(3)=}")
+    train_dataset["response"]   = None
+    dev_dataset["response"]     = None
+    print(f"{dev_dataset.head(2)=}")
     cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=kwargs["cache_dir"])
     trainer = DocumentGroundedDialogRetrievalTrainer(
         model=cache_path,
@@ -133,15 +137,13 @@ def main(**kwargs):
 
     trainer.train(
         batch_size=128,
-        total_epoches=50,
+        total_epoches=50-2,
         accumulation_steps=kwargs["gradient_accumulation_steps"],
         loss_log_freq=1
         # per_gpu_batch_size=args.per_gpu_batch_size,
     )
     
-    trainer.evaluate(
-        checkpoint_path=os.path.join(trainer.model.model_dir,
-                                    'finetuned_model.bin'))
+    trainer.evaluate()
     
     # TODO add en-vi en-fr in case of translate-train
     extended_lang = langs - set(["fr", "vi"])
