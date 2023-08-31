@@ -43,13 +43,15 @@ def _replace_tags_back(text, tags):
     return all_queries
 
 
-def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:int=128):
+def translate(df, colnames:list, source_lang:str, target_lang:str, lang_token, batch_size:int=64):
     tokenize  = lambda x: tokenizer(x, padding=True, truncation=True, return_tensors="pt").to(model.device)
 
     df_translate = df.copy()
     
     with torch.no_grad():
         for colname in colnames:
+            if lang_token:
+                df_translate[colname] = df_translate[colname].apply(lambda x: re.sub(r'<en>\s*', '', x))
 
             if colname == "query" or colname == "input":
                 queries, role_tags = zip(*df_translate[colname].apply(_split_list_strings))
@@ -75,16 +77,21 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:in
             if colname == "query" or colname == "input":
                 translated_query = _replace_tags_back(text=translated_query, tags=role_tags)  # ' '.join(f"{x} {y}" for x, y in zip(tag, translated_query))
                 
-            translated_query = [re.sub(f'^<\s*{source_lang}\s*>\s*', '', q)  for q in translated_query]
+            # translated_query = [re.sub(f'^<\s*{source_lang}\s*>\s*', '', q)  for q in translated_query]
 
             df_translate[colname] = translated_query
 
     return df_translate
 
 
-def translate_passage_text(passage_col, target_lang:str, source_lang:str, batch_size:int=128):
+def translate_passage_text(passage_col, target_lang:str, source_lang:str, lang_token, batch_size:int=64):
     tokenize  = lambda x: tokenizer(x, return_tensors="pt",  padding=True, truncation=True).to(model.device)
+
+
     unique_texts = pd.unique(passage_col.explode().apply(lambda x: x.get('text')))
+    if lang_token:
+        
+        unique_texts = [re.sub(r'<en>\s*', '', x) for x in unique_texts]
 
     with torch.no_grad():
         data_loader = DataLoader(
@@ -101,15 +108,18 @@ def translate_passage_text(passage_col, target_lang:str, source_lang:str, batch_
 
             translated_tokens   = model.generate(**inputs, forced_bos_token_id=tokenizer.lang_code_to_id[iso_lang[target_lang]], max_length=256)
             translated_tmp    = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
-            passages_dict.update({k: v for k, v in zip(batch, translated_tmp)})
+            passages_dict.update({k : v for k, v in zip(batch, translated_tmp)})
 
-    translated_col = passage_col.progress_apply(lambda x: json.dumps([{"pid": passage_dicts["pid"], "title": passage_dicts["title"], "text": re.sub(f'^<\s*{source_lang}\s*>\s*', '', passages_dict[passage_dicts["text"]])} for passage_dicts in x], ensure_ascii=False))
+    translated_col = passage_col.progress_apply(lambda x: json.dumps([{"pid": item["pid"], "title": item["title"], "text": passages_dict[re.sub(r'<en>\s*', '', item["text"])]} for item in x], ensure_ascii=False))
 
     return translated_col
 
 
-def translate_passages(passage_col:pd.Series, all_passages:list, target_lang:str, batch_size:int=128):
+def translate_passages(passage_col:pd.Series, all_passages:list, target_lang:str, lang_token, batch_size:int=64):
     tokenize  = lambda x: tokenizer(x, return_tensors="pt",  padding=True, truncation=True).to(model.device)
+
+    if lang_token:
+        all_passages = [re.sub(r'<en>\s*', '', x) for x in all_passages]
 
     with torch.no_grad():
         data_loader = DataLoader(
@@ -126,8 +136,9 @@ def translate_passages(passage_col:pd.Series, all_passages:list, target_lang:str
             translated_tokens   = model.generate(**inputs, forced_bos_token_id=tokenizer.lang_code_to_id[iso_lang[target_lang]], max_length=256)
             translated_tmp      = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
             passages_dict.update({k: v for k, v in zip(batch, translated_tmp)})
-  
-        translated_passages = passage_col.apply(lambda x: json.dumps([passages_dict.get(item) for item in x], ensure_ascii=False))
+
+        # passage_col = passages_dict
+        translated_passages = passage_col.apply(lambda x: json.dumps([passages_dict.get(re.sub(r'<en>\s*', '', item)) for item in x], ensure_ascii=False))
 
     return translated_passages
 
@@ -170,6 +181,8 @@ def main(**kwargs):
     logger.info(f"enter translate-{kwargs['translate_mode']} mode on {device=}...")
     
     train_dataset = get_dataset(**kwargs)
+    
+
     train_dataset.to_csv("the_original_en.csv", index=False)
     preprocessing.save_to_json(df=train_dataset, export_cols=train_dataset.columns, fname= f"ttrain_original_{kwargs['source_langs'][0]}.json", pdir=kwargs["cache_dir"])
     if train_dataset is None: # translate dataset already exists
@@ -192,10 +205,11 @@ def main(**kwargs):
         generation_path = os.path.join(kwargs["cache_dir"], f"ttrain_generation_{target_lang}.json")
         
         if kwargs["retrieval_step"] and not os.path.exists(retrieval_path):
+            kwargs["lang_token"] = None
             retrieval_translated_df  = translate(df=train_dataset, 
                                                 colnames=["query", "positive", "negative"], 
                                                 source_lang=source_lang, 
-                                                target_lang=target_lang)
+                                                target_lang=target_lang, lang_token=kwargs["lang_token"])
 
 
             # retrieval_translated_df["passages"] = translate_passages(passage_col= retrieval_translated_df["passages"], all_passages=all_passages, target_lang=target_lang)
@@ -205,8 +219,11 @@ def main(**kwargs):
 
 
         if kwargs["rerank_step"] and not os.path.exists(rerank_path):    
-            rerank_translated_df = translate(df=train_dataset, colnames=["input"], target_lang=target_lang,  source_lang=source_lang)
-            rerank_translated_df["passages"] = translate_passage_text(passage_col=rerank_translated_df["passages"], target_lang=target_lang, source_lang=source_lang)
+            rerank_translated_df = translate(df=train_dataset, colnames=["input"], target_lang=target_lang,  source_lang=source_lang, lang_token=kwargs["lang_token"])
+            rerank_translated_df["passages"] = translate_passage_text(passage_col=rerank_translated_df["passages"], 
+                                                                      target_lang=target_lang, 
+                                                                      source_lang=source_lang,
+                                                                     lang_token=kwargs["lang_token"])
   
             rerank_translated_df["lang"] = target_lang
 
@@ -214,8 +231,8 @@ def main(**kwargs):
 
         if kwargs["generation_step"] and not os.path.exists(generation_path):
             colnames = ["query", "response"]
-            generation_translated_df = translate(df=train_dataset, colnames=colnames, source_lang=source_lang, target_lang=target_lang)
-            generation_translated_df["rerank"] = translate_passages(passage_col= generation_translated_df["rerank"], all_passages=all_passages, target_lang=target_lang)
+            generation_translated_df = translate(df=train_dataset, colnames=colnames, source_lang=source_lang, target_lang=target_lang, lang_token=kwargs["lang_token"])
+            generation_translated_df["rerank"] = translate_passages(passage_col= generation_translated_df["rerank"], all_passages=all_passages, target_lang=target_lang, lang_token=kwargs["lang_token"])
             generation_translated_df["lang"] = target_lang
 
             preprocessing.save_to_json(df=generation_translated_df, export_cols=generation_translated_df.columns, fname= f"ttrain_generation_{target_lang}.json", pdir=kwargs["cache_dir"])
