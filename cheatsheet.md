@@ -82,11 +82,14 @@ bash slurm_script_kwargs_pipeline.sh --lang_token 0 --fname 1_baseline_lp --batc
 # experiment 2
 bash slurm_script_kwargs_pipeline.sh --lang_token 1 --fname 1_baseline_lt --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 2
 
-# translate-train
-bash slurm_script_kwargs_pipeline.sh --fname ttrain_2epochs --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi'], ['en']]" --target_langs "[]" --source_langs "[]" --length_penalty 2
+# translate-train TRAIN
+bash slurm_script_kwargs_pipeline.sh --fname ttrain_2epochs_nlt --translate_mode train --lang_token 0 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi', 'en'], ['fr', 'vi'], ['fr'], ['vi'], ['en']]" --target_langs "['fr', 'vi']" --source_langs "['en']" --length_penalty 1
+
+# translate-train INFERENCE
+bash slurm_script_kwargs_pipeline.sh --fname ttrain_2epochs --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 2
 
 # translate-test
-bash slurm_script_kwargs_pipeline.sh --fname ttest --translate_mode test --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "['en']" --source_langs "['fr', 'vi']" --source_langs "['en']" --length_penalty 2
+bash slurm_script_kwargs_pipeline.sh --fname ttest --translate_mode test --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "['en']" --source_langs "['fr', 'vi']" --length_penalty 2
 
 ```
 

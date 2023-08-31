@@ -121,7 +121,6 @@ def main(**kwargs):
         retrieval_file = json.load(file_in)
 
     for lang in kwargs["eval_lang"]:
-        print(f"{lang=}")
         retrieval_result    = retrieval_file['outputs'] # predicted
         retrieval_targets   = retrieval_file['targets']
         queries             = retrieval_file['queries']
@@ -133,10 +132,11 @@ def main(**kwargs):
         ids_list = []
         output_list = []
         positive_pids_list = []
+        responses_list = []
         # ptr = -1
 
         # for ptr, x in tqdm(enumerate(all_querys)):
-        for idx, (query, language, all_candidates, target) in enumerate(zip(queries, languages, retrieval_result, retrieval_targets)):
+        for idx, (query, language, all_candidates, target, response) in enumerate(zip(queries, languages, retrieval_result, retrieval_targets, responses)):
             # ptr += 1
             # now_id = str(ptr)
             # now_input = x
@@ -169,7 +169,7 @@ def main(**kwargs):
             output_list.append(str(now_output))
             lang_list.append(language)
             positive_pids_list.append(json.dumps([get_positive_pid]))
-            
+            responses_list.append(response)
             # input_list.append(now_input['query'])
             # passages_list.append(str(now_passages))
             # ids_list.append(now_id)
@@ -179,9 +179,8 @@ def main(**kwargs):
         
 
         evaluate_dataset = {'input': input_list, 'id': ids_list, 'passages': passages_list, 'output': output_list,
-                            'positive_pids': positive_pids_list, 'langs': lang_list, 'responses': responses}
+                            'positive_pids': positive_pids_list, 'langs': lang_list, 'responses': responses_list}
 
-        print(f"evaluation results on {', '.join(lang)}:")
         pipeline_ins(evaluate_dataset)
 
         if sorted(lang) == sorted(langs):

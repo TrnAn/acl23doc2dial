@@ -100,6 +100,7 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
         outputs = []
         targets = []
         self.guess = []
+        all_langs = set()
         with torch.no_grad():
             for jobj in dataset:
                 inst_id = jobj['id']
@@ -110,6 +111,7 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
                 query = jobj['query']
                 responses = jobj["responses"]
                 langs = jobj["langs"] # add language info
+                all_langs.add(langs)
                 answer = jobj['output'][0]['answer']
               
                 scored_pids = [(p['pid'], prob)
@@ -154,9 +156,9 @@ class DocumentGroundedDialogRerankPipeline(Pipeline):
         result_dict = {'outputs': outputs,
                        'targets': targets
                        }
-   
+    
         meters = measure_result(result_dict)
-        logger.info(f"{meters=}")
+        logger.info(f"final results for {'_'.join(list(all_langs))}: {meters=}")
 
 
     def postprocess(self, inputs: list):
