@@ -1,7 +1,9 @@
 import train_retrieval
+import train_domain_clf
 import train_rerank
 import train_generation
 
+import inference_domain_clf
 import inference_retrieval
 import inference_rerank
 import inference_generation
@@ -33,6 +35,12 @@ if __name__ == '__main__':
             }
     }
 
+    # apply domain classfication to filter retrieved passages
+    if bool(kwargs["apply_dclf"]):
+        print("apply domain classification to retrieval step...")
+        pipeline_steps["train"]["train_retrieval"] = train_domain_clf
+        pipeline_steps["inference"]["inference_retrieval"] = inference_domain_clf
+
     # start training pipeline
     if not kwargs['only_inference']:
         print("START TRAINING...")
@@ -45,7 +53,7 @@ if __name__ == '__main__':
                 tmp[f"{step_name}_step"] = True
                 translate_train.main(**tmp)
                 print(f"finished translate-train...")
-
+            
             logging.info(f"start {name} step...")
             train_step.main(**kwargs)
             print(f"finished training...")

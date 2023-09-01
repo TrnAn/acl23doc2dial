@@ -27,7 +27,7 @@ iso_lang = {
 }
 
 def _split_list_strings(text):
-    pattern         = r'<last_turn>|<user>|<agent>'
+    pattern         = r'<last_turn>|<user>|<agent>|<response>'
     modified_text   = re.split(pattern, text)
     tags            = re.findall(pattern, text)
 
@@ -53,7 +53,7 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, lang_token, b
             if lang_token:
                 df_translate[colname] = df_translate[colname].apply(lambda x: re.sub(r'<en>\s*', '', x))
 
-            if colname == "query" or colname == "input":
+            if colname in ["query", "input", "response"]:
                 queries, role_tags = zip(*df_translate[colname].apply(_split_list_strings))
                 queries = list(chain.from_iterable(queries))
             else:
@@ -74,7 +74,7 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, lang_token, b
                 translated_tokens   = model.generate(**inputs, forced_bos_token_id=tokenizer.lang_code_to_id[iso_lang[target_lang]], max_length=256)
                 translated_query    += tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)      
 
-            if colname == "query" or colname == "input":
+            if colname in ["query", "input", "response"]:
                 translated_query = _replace_tags_back(text=translated_query, tags=role_tags)  # ' '.join(f"{x} {y}" for x, y in zip(tag, translated_query))
                 
             # translated_query = [re.sub(f'^<\s*{source_lang}\s*>\s*', '', q)  for q in translated_query]
@@ -207,7 +207,7 @@ def main(**kwargs):
         if kwargs["retrieval_step"] and not os.path.exists(retrieval_path):
             kwargs["lang_token"] = None
             retrieval_translated_df  = translate(df=train_dataset, 
-                                                colnames=["query", "positive", "negative"], 
+                                                colnames=["query", "positive", "negative", "response"], 
                                                 source_lang=source_lang, 
                                                 target_lang=target_lang, lang_token=kwargs["lang_token"])
 

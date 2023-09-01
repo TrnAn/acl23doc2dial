@@ -56,7 +56,7 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:in
     with torch.no_grad():
         for colname in colnames:
             df_translate[colname] = df_translate[colname].apply(lambda x: re.sub(r'<fr>\s*|<vi>\s*|<en>\s*', '', x))
-            if colname == "query":
+            if colname in ["query", "input", "response"]:
                 queries, role_tags = zip(*df_translate[colname].apply(_split_list_strings))
                 queries = list(chain.from_iterable(queries))
             else:
@@ -77,7 +77,7 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, batch_size:in
                 translated_query    += tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
 
 
-            if colname == "query":
+            if colname in ["query", "input", "response"]:
                 translated_query = _replace_tags_back(text=translated_query, tags=role_tags)  # ' '.join(f"{x} {y}" for x, y in zip(tag, translated_query))
 
             translated_query = [(f"{LANG_TOKENS_DD[target_lang]} " if lang_token else '') + q.replace(f"{LANG_TOKENS_DD[source_lang]} ", '') for q in translated_query]
