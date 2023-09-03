@@ -53,15 +53,20 @@ def main(**kwargs):
 
     parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
     all_passages = []
+    
+    if kwargs["translate_mode"] == "train":
+        langs = set(list(langs) + kwargs["source_langs"])
 
     for file_name in langs:
         with open(f'{parent_dir}/{file_name}.json') as f:
             all_passages += json.load(f)
 
-    preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
+    # preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
     freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
     exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_retrieval.png")
 
+    train_dataset["response"]   = None
+    dev_dataset["response"]     = None
     retrieval_trainer = DocumentGroundedDialogRetrievalTrainer(
         model           = cache_path,
         train_dataset   = train_dataset.to_dict('records'),

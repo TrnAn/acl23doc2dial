@@ -86,13 +86,15 @@ def main(**kwargs):
 
     clf_model = XLMRobertaDomainClfHead(config=config, adapt_args=adapt_args, model=new_model)
     print(f"{adapt_args['labels']=}")
+    dev_dataset = pd.DataFrame(eval_dataset)
+    dev_dataset["negative"] = None
 
     trainer = DocumentGroundedDialogDomainClfTrainer(
         model           = copy.deepcopy(clf_model), 
         tokenizer_dir   = tokenizer_dir,
         checkpoint_path = os.path.join(tokenizer_dir, 'nlp_convai_domain_clf'), 
         train_dataset   = None, 
-        eval_dataset    = eval_dataset,
+        eval_dataset    = dev_dataset.to_dict('records'),
         num_classes     = adapt_args["num_classes"],
         lang_token      = kwargs["lang_token"],
         eval_lang       = kwargs["eval_lang"]

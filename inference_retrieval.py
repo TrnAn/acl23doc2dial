@@ -46,20 +46,18 @@ def main(**kwargs):
     #     langs += [f"{src_lang}2{kwargs['target_langs'][0]}" for src_lang in kwargs["source_langs"]]
 
     all_passages = []
-    
-    for lang in langs:
-        print(f"{lang=}")
-        with open(f'{parent_dir}/{lang}.json', encoding='utf-8-sig') as f:
-            all_passages += json.load(f)
-
-            # if kwargs["translate_mode"] == "train":
-            #     translated_passages += get_unique_passages(locals()[f"train_dataset_{lang}"], lang=lang) if kwargs["lang_token"] else get_unique_passages(locals()[f"train_dataset_{lang}"])
 
     # add source lang -> target_lang translations (monolingual setting)
     if kwargs["translate_mode"] == "test":
         for src_lang in kwargs["source_langs"]:
             with open(f'{kwargs["cache_dir"]}/{parent_dir}/{src_lang}2{kwargs["target_langs"][0]}.json', encoding='utf-8-sig') as f:
                 all_passages += json.load(f)    
+    else:
+        for lang in langs:
+            print(f"{lang=}")
+            with open(f'{parent_dir}/{lang}.json', encoding='utf-8-sig') as f:
+                all_passages += json.load(f)
+
 
     # all_passages_w_translations =  list(set(all_passages) | set(translated_passages))
     dev_dataset = pd.DataFrame(eval_dataset)
@@ -77,10 +75,7 @@ def main(**kwargs):
         save_output=kwargs["save_output"]
     )
 
-    trainer.evaluate(
-        # checkpoint_path=os.path.join(trainer.model.model_dir,
-        #                             f'finetuned_model.bin')
-                                    )
+    trainer.evaluate()
 
 
 if __name__ == '__main__':

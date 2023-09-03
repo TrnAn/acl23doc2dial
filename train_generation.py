@@ -424,12 +424,17 @@ def main(**kwargs):
         "cn": (train_dataset_cn, dev_dataset_cn)
     }
 
+    train_langs = langs
     train_dataset, dev_dataset = [], []
-    for lang in set(kwargs["target_langs"]):
+
+    if kwargs["translate_mode"] == "test":
+        train_langs = set(kwargs["target_langs"])
+
+    for lang in train_langs:
         train_tmp, dev_tmp = lang_dd[lang]
         train_dataset.append(train_tmp)
         dev_dataset.append(dev_tmp)
-        
+    
     train_dataset   = pd.concat(train_dataset) 
     dev_dataset     = pd.concat(dev_dataset)
 
