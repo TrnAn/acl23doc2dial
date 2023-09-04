@@ -17,6 +17,7 @@ import utils.data_exploration as exploration
 
 
 def main(**kwargs):
+    print("start domain classification in retrieval step...")
     # cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=kwargs["cache_dir"])
     fr_train_dataset, vi_train_dataset = None, None
 
@@ -81,12 +82,12 @@ def main(**kwargs):
         save_output     = kwargs["save_output"]
     )
     
-    # retrieval_trainer.train(
-    #     batch_size=128,
-    #     total_epoches=50,
-    #     accumulation_steps=kwargs["gradient_accumulation_steps"],
-    #     loss_log_freq=1
-    # )
+    retrieval_trainer.train(
+        batch_size=128,
+        total_epoches=50,
+        accumulation_steps=kwargs["gradient_accumulation_steps"],
+        loss_log_freq=1
+    )
 
     retrieval_trainer_copy = copy.deepcopy(retrieval_trainer)
     tokenizer_dir   = retrieval_trainer_copy.model.model_dir

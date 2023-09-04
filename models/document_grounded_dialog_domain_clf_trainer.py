@@ -104,12 +104,15 @@ def collate(batch):
     langs   = [item['lang']    for item in batch]
     return query, labels, langs
 
+            
 def collate_retrieval(batch):
-    query   = [item['query']    for item in batch]
-    positive = [item['positive']  for item in batch]
-    labels  = [item['domain']   for item in batch]
-    langs   = [item['lang']    for item in batch]
-    return query, positive, labels, langs
+    query   =   [item['query']    for item in batch]
+    response =  [item['response']  for item in batch]
+    positive =  [item['positive']  for item in batch]
+    labels  =   [item['domain']   for item in batch]
+    langs   =   [item['lang']    for item in batch]
+
+    return query, response, positive, labels, langs
 
 def prepare_optimizer(model, lr, weight_decay, eps):
     no_decay = ['bias', 'LayerNorm.weight']
@@ -320,7 +323,12 @@ class DocumentGroundedDialogDomainClfTrainer(EpochBasedTrainer):
         Predict domain given query
         """
         def filter_queries_by_domain(payload, filter_domain):
-            filtered_list = [{"query":query, "positive": positive, "domain": domain, "lang":lang} for query, positive, domain, lang, pred_labels in payload if pred_labels == filter_domain]
+     
+            filtered_list = [{"query":query, 
+                              "response": response, 
+                              "positive": positive, 
+                              "domain": domain, 
+                              "lang":lang} for query, response, positive, domain, lang, pred_labels in payload if pred_labels == filter_domain]
             return filtered_list
 
         # if checkpoint_path is None and os.path.isdir(self.save_dir):
@@ -342,7 +350,7 @@ class DocumentGroundedDialogDomainClfTrainer(EpochBasedTrainer):
             queries_of_domain = []
 
             for payload in tqdm.tqdm(data_loader):
-                query, positive, domain, lang = payload
+                query, response,  positive, domain, lang = payload
                 processed = self.preprocessor({'query': query},
                                             invoke_mode=ModeKeys.INFERENCE)
 
@@ -351,7 +359,7 @@ class DocumentGroundedDialogDomainClfTrainer(EpochBasedTrainer):
                 pred_labels = torch.argmax(logits, dim=1).detach().cpu().numpy()
                 pred_labels = [self.id2label[label] for label in pred_labels]
                 
-                tmp = zip(query, positive, domain, lang, pred_labels)
+                tmp = zip(query, response, positive, domain, lang, pred_labels)
                 queries_of_domain += filter_queries_by_domain(tmp, filter_domain)
 
                 # print(list(zip(domain, pred_labels)))

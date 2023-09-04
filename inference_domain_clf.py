@@ -39,7 +39,8 @@ def main(**kwargs):
     pattern = r"//(?!.*//).*?-(.*)$"
     eval_dataset  = [{"query": item["query"], 
                       "positive": item["positive"],
-                      "negative": item["negative"],
+                      "negative": None,
+                      "response": item["response"],
                       "domain": re.search(pattern, item["positive"]).group(1),
                       "lang": item["lang"]} for item in eval_dataset if re.search(pattern, item["positive"])]
 
@@ -85,10 +86,9 @@ def main(**kwargs):
     
 
     clf_model = XLMRobertaDomainClfHead(config=config, adapt_args=adapt_args, model=new_model)
-    print(f"{adapt_args['labels']=}")
     dev_dataset = pd.DataFrame(eval_dataset)
-    dev_dataset["negative"] = None
-
+    # dev_dataset["negative"] = None
+    print(dev_dataset.columns)
     trainer = DocumentGroundedDialogDomainClfTrainer(
         model           = copy.deepcopy(clf_model), 
         tokenizer_dir   = tokenizer_dir,

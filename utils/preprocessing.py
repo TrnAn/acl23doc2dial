@@ -129,6 +129,7 @@ def get_args():
     parser.add_argument("--rerank-epoch", help= "Number of epochs for rerank", type=int, default=10)
     parser.add_argument("--generation-epoch", help= "Number of epochs for generation", type=int, default=10)
     parser.add_argument("--length-penalty", help= "Number of epochs for generation", type=int, default=1)
+    parser.add_argument("--apply-dclf", help= "Add domain classfication to retrieval step", type=int, default=0)
     args, _ = parser.parse_known_args()
 
     return vars(args)

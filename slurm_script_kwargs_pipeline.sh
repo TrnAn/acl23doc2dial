@@ -16,6 +16,8 @@ source_langs="["en"]"
 equal_dataset_size=0
 add_n_hard_negatives=0
 lang_token=0
+apply_dclf=0
+length_penalty=1
 
 while [ $# -gt 0 ]; do
     if [[ $1 == "--"* ]]; then
@@ -56,9 +58,9 @@ export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256  &&\
 
 if [[ $lang_token -eq 1 ]]
 then
-    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --length-penalty $length_penalty --add-n-hard-negatives $add_n_hard_negatives --equal-dataset-size $equal_dataset_size --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode "$translate_mode" --lang-token
+    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --apply-dclf $apply_dclf --length-penalty $length_penalty --add-n-hard-negatives $add_n_hard_negatives --equal-dataset-size $equal_dataset_size --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode "$translate_mode" --lang-token
 else
-    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --length-penalty $length_penalty  --add-n-hard-negatives $add_n_hard_negatives --equal-dataset-size $equal_dataset_size --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode "$translate_mode"
+    python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --apply-dclf $apply_dclf --length-penalty $length_penalty  --add-n-hard-negatives $add_n_hard_negatives --equal-dataset-size $equal_dataset_size --target-langs "$target_langs" --source-langs "$source_langs" --batch-accumulation --per-gpu-batch-size $per_gpu_batch_size  --cache-dir $fname --eval-input-file $dev_dir --eval-lang "$eval_lang" --translate-mode "$translate_mode"
 fi
 popd
 exit 0
