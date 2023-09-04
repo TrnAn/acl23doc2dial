@@ -297,12 +297,13 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
     def evaluate_by_domain(self, trainer, per_gpu_batch_size=32):
             
             def collate_retrieval(batch):
-                query   = [item['query']    for item in batch]
-                positive = [item['positive']  for item in batch]
-                labels  = [item['domain']   for item in batch]
-                langs   = [item['lang']    for item in batch]
+                query   =   [item['query']    for item in batch]
+                response =  [item['response']  for item in batch]
+                positive =  [item['positive']  for item in batch]
+                labels  =   [item['domain']   for item in batch]
+                langs   =   [item['lang']    for item in batch]
 
-                return query, positive, labels, langs
+                return query, response, positive, labels, langs
             
             """
             Evaluate testsets
@@ -315,12 +316,12 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                 for idx, lang in enumerate(self.eval_lang):
                     save_output = True if idx == 0 else False
                     
-                    results = {'outputs': [], 'targets': []}
+                    results = {'queries': [], 'response': [], 'langs': [], 'outputs': [], 'targets': []}
                     
                     for domain in trainer.model.labels:
-                        results_domain = {'outputs': [], 'targets': []}
+                        results_domain = {'queries': [], 'response': [], 'langs': [], 'outputs': [], 'targets': []}
                         logger.info(f"evaluate domain: {domain} for {', '.join(lang)}")
-                        
+
                         domain_queries, domain_passages = trainer.predict(
                             dataset=self.eval_dataset, 
                             filter_domain=domain, 
@@ -352,12 +353,12 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                         faiss_index.add(domain_ctx_vector) # context -> passages
 
                         for payload in tqdm.tqdm(valid_loader):
-                            queries, positives, domains, curr_langs = payload
+                            query, response, positive, domains, curr_lang = payload
 
-                            if not bool(set(lang) & set(curr_langs)): # language is not in current batch
+                            if not bool(set(lang) & set(curr_lang)): # language is not in current batch
                                 continue
 
-                            processed = self.preprocessor({'query': queries},
+                            processed = self.preprocessor({'query': query},
                                                         invoke_mode=ModeKeys.INFERENCE)
                             query_vector = self.model.encode_query(
                                 processed).detach().cpu().numpy().astype('float32')
@@ -366,16 +367,23 @@ class DocumentGroundedDialogRetrievalTrainer(EpochBasedTrainer):
                             results_domain['outputs'] += [[
                                 domain_passages[x] for x in retrieved_ids
                             ] for retrieved_ids in Index.tolist()]
-                            results_domain['targets'] += positives
+                            results_domain['targets'] += positive
+                            results_domain['queries'] += query
+                            results_domain['response']+= response
+                            results_domain['langs']   += curr_lang
+
                             # print(f"{results_domain['outputs'][-1][0]=} = {positives[-1]=}")
 
 
                         if results_domain['outputs']:
                             meters = measure_result(results_domain)
                             logger.info(f"{'_'.join(lang+[domain])} - {meters}")
-
                             results["outputs"] += results_domain['outputs']
-                            results["targets"] += results_domain['targets']
+                            results["targets"] += results_domain['targets']   
+                            results["queries"] += results_domain['queries']     
+                            results["response"] += results_domain['response']    
+                            results["langs"] += results_domain['langs']        
+
 
                             # result_path = os.path.join(self.model.model_dir, f'evaluate_result_{domain}.json')
                             # with open(result_path, 'w') as f:

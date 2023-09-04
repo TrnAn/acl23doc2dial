@@ -53,9 +53,9 @@ class DocumentGroundedDialogGeneratePreprocessor(Preprocessor):
 
          # add special language tokens <lang> to tokenizer
         if kwargs["lang_token"]:
-            # self.rerank_tokenizer.add_tokens(LANG_TOKENS_DD.values())
-            # self.generation_tokenizer.add_tokens(LANG_TOKENS_DD.values())
-            self.rerank_tokenizer.add_special_tokens({"additional_special_tokens": list(LANG_TOKENS_DD.values())})
+            self.rerank_tokenizer.add_tokens(LANG_TOKENS_DD.values())
+            self.generation_tokenizer.add_tokens(LANG_TOKENS_DD.values())
+            # self.rerank_tokenizer.add_special_tokens({"additional_special_tokens": list(LANG_TOKENS_DD.values())})
             # self.generation_tokenizer.add_special_tokens({"additional_special_tokens": list(LANG_TOKENS_DD.values())})
 
         self.token_length = len(self.generation_tokenizer)
