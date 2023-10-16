@@ -64,6 +64,8 @@ class XLMRobertaDomainClfHead(XLMRobertaPreTrainedModel):
                                    attention_mask=query_attention_mask, 
                                    gck_segment=gck_segment).to(device=self.device)
         
+        query_vector = query_vector
+        
         x = self.dropout(query_vector)
         x = self.dense(x)
         x = torch.tanh(x)
@@ -173,6 +175,10 @@ class DocumentGroundedDialogDomainClfTrainer(EpochBasedTrainer):
                 state_dict = torch.load(model_fdir)
                 self.model.load_state_dict(state_dict)  
 
+        if kwargs["lang_token"] is not None:
+            self.model.qry_encoder.encoder.resize_token_embeddings(self.preprocessor.token_length)  # resize query encoder of DPR model
+
+
         self.model.to(self.device)
 
         self.label2id   = defaultdict(int)
@@ -252,18 +258,18 @@ class DocumentGroundedDialogDomainClfTrainer(EpochBasedTrainer):
                 total_score += sum([f1, macro_acc])
 
             logger.info(
-                f'obtain max score: {total_score:.4f} (best score: {best_score:.4f})')
+                f'obtain max score: {total_score:.4f}') # (best score: {best_score:.4f})
             
-            if total_score >= best_score:
-                best_score = total_score
-                os.makedirs(self.checkpoint_path, exist_ok=True)
-                model_path = os.path.join(self.checkpoint_path,
-                                          'finetuned_model.bin')
-                state_dict = self.model.state_dict()
-                torch.save(state_dict, model_path)
-                logger.info(
-                    'epoch %d obtain max score: %.4f, saving model to %s' %
-                    (epoch, total_score, model_path))
+            # if total_score >= best_score:
+                # best_score = total_score
+            os.makedirs(self.checkpoint_path, exist_ok=True)
+            model_path = os.path.join(self.checkpoint_path,
+                                        'finetuned_model.bin')
+            state_dict = self.model.state_dict()
+            torch.save(state_dict, model_path)
+            logger.info(
+                'epoch %d obtain max score: %.4f, saving model to %s' %
+                (epoch, total_score, model_path))
                 
 
     def evaluate(self, per_gpu_batch_size=32):
