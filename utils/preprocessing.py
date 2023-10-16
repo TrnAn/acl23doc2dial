@@ -154,8 +154,12 @@ def get_unique_langs(arr):
 
 def add_translation2trainset(train_df:pd.DataFrame, lang:str, pipeline_step:str, dir:str):
     logger.info(f"add translated datapoints to train dataset...")
+    fname = f"{dir}/ttrain_{pipeline_step}_{lang}.json"
 
-    translated_df = pd.read_json(f"{dir}/ttrain_{pipeline_step}_{lang}.json", lines=True, encoding="utf-8-sig")
+    if not os.path.exists(fname):
+        return train_df
+    
+    translated_df = pd.read_json(fname, lines=True, encoding="utf-8-sig")
     if pipeline_step == "generation":
         translated_df = translated_df.rename({"passages": "rerank"},  axis='columns')
 
@@ -172,6 +176,9 @@ def add_translation2trainset(train_df:pd.DataFrame, lang:str, pipeline_step:str,
 
 
 def get_unique_passages(df:pd.DataFrame, lang:str=None):
+    if df is None:
+        return []
+    
     unique_passages = df["positive"].tolist() + df["negative"].tolist()
     if lang is not None:
         unique_passages = [f"{LANG_TOKENS_DD[lang]} {p}" for p in unique_passages]
