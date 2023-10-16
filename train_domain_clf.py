@@ -12,13 +12,13 @@ import json
 import copy
 import utils.preprocessing as preprocessing
 from utils.seed import set_seed
-from utils.preprocessing import get_args, add_translation2trainset, get_unique_passages, add_hard_negatives
+from utils.preprocessing import get_args
 import utils.data_exploration as exploration
-
+set_seed()
+SEED = 42
 
 def main(**kwargs):
     print("start domain classification in retrieval step...")
-    # cache_path = snapshot_download('DAMO_ConvAI/nlp_convai_retrieval_pretrain', cache_dir=kwargs["cache_dir"])
     fr_train_dataset, vi_train_dataset = None, None
 
     langs = set(kwargs["source_langs"] + kwargs["target_langs"]) if kwargs["translate_mode"] == "test" else set(item for sublist in kwargs["eval_lang"] for item in sublist) 
@@ -62,7 +62,6 @@ def main(**kwargs):
         with open(f'{parent_dir}/{file_name}.json') as f:
             all_passages += json.load(f)
 
-    # preprocessing.save_to_json(dev_dataset, dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
     freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
     exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_retrieval.png")
 
@@ -118,15 +117,11 @@ def main(**kwargs):
         )
     
     
-    trainer.train(total_epoches=20)
+    trainer.train(total_epoches=10)
     trainer.evaluate()
 
     retrieval_trainer.evaluate()
     retrieval_trainer.evaluate_by_domain(trainer=trainer)
-
-    trainer.predict(dataset=dev_dataset.to_dict('records'), 
-                    filter_domain="Health", 
-                    all_passages=all_passages)
 
 
 if __name__ == '__main__':
