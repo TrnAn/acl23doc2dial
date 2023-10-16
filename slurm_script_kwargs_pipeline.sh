@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # set default
-user=tran
+user=
 only_train=0
 only_inference=0
 only_english=0
@@ -11,8 +11,8 @@ seed=42
 translate_train=0
 cache_dir=.
 translate_mode=""
-target_langs="["fr", "vi"]"
-source_langs="["en"]"
+target_langs="['fr', 'vi']"
+source_langs="['en']"
 equal_dataset_size=0
 add_n_hard_negatives=0
 lang_token=0
@@ -65,5 +65,3 @@ fi
 popd
 exit 0
 EOT
-
-# --eval-lang [['fr', 'vi', 'en'], ['fr', 'vi'], ['fr'], ['vi'], ['en']]
