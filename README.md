@@ -3,10 +3,10 @@
 ```bash
 .
 │   cheatsheet.md                                         # cheatsheet with example commands to start experiments
-│   cn_train_dataset_retrieval_generation_hn.json         # preprocesses Chinese data containing hard negatives, i.e., BM25
+│   cn_train_dataset_retrieval_generation_hn.json         # preprocessed Chinese data containing hard negatives, i.e., BM25
 │   environment.yml                                       # set up env
-│   en_train_dataset_retrieval_generation_hn.json         # preprocesses English data containing hard negatives, i.e., BM25
-│   en_train_dataset_retrieval_generation_in_domain.json  
+│   en_train_dataset_retrieval_generation_hn.json         # preprocessed English data containing hard negatives, i.e., BM25
+│   en_train_dataset_retrieval_generation_in_domain.json  # preprocessed English data containing random negative samples within domain
 │   inference_domain_clf.py
 │   inference_generation.py
 │   inference_rerank.py
