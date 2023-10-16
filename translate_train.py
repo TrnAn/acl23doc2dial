@@ -14,7 +14,7 @@ from itertools import chain
 from tqdm import tqdm
 tqdm.pandas()
 
-# from utils import preprocessing
+
 device      = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model       = AutoModelForSeq2SeqLM.from_pretrained("facebook/nllb-200-distilled-1.3B")
 tokenizer   = NllbTokenizerFast.from_pretrained("facebook/nllb-200-distilled-1.3B")
@@ -77,8 +77,6 @@ def translate(df, colnames:list, source_lang:str, target_lang:str, lang_token, b
             if colname in ["query", "input", "response"]:
                 translated_query = _replace_tags_back(text=translated_query, tags=role_tags)  # ' '.join(f"{x} {y}" for x, y in zip(tag, translated_query))
                 
-            # translated_query = [re.sub(f'^<\s*{source_lang}\s*>\s*', '', q)  for q in translated_query]
-
             df_translate[colname] = translated_query
 
     return df_translate
@@ -137,7 +135,6 @@ def translate_passages(passage_col:pd.Series, all_passages:list, target_lang:str
             translated_tmp      = tokenizer.batch_decode(translated_tokens, skip_special_tokens=True)
             passages_dict.update({k: v for k, v in zip(batch, translated_tmp)})
 
-        # passage_col = passages_dict
         translated_passages = passage_col.apply(lambda x: json.dumps([passages_dict.get(re.sub(r'<en>\s*', '', item)) for item in x], ensure_ascii=False))
 
     return translated_passages
@@ -211,8 +208,6 @@ def main(**kwargs):
                                                 source_lang=source_lang, 
                                                 target_lang=target_lang, lang_token=kwargs["lang_token"])
 
-
-            # retrieval_translated_df["passages"] = translate_passages(passage_col= retrieval_translated_df["passages"], all_passages=all_passages, target_lang=target_lang)
             retrieval_translated_df["lang"]     = target_lang
 
             preprocessing.save_to_json(df=retrieval_translated_df, export_cols=retrieval_translated_df.columns, fname= retrieval_fname, pdir=kwargs["cache_dir"])
