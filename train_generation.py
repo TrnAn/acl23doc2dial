@@ -27,16 +27,13 @@ sns.set(style='whitegrid')
 sns.set_palette('pastel')
 from torch.cuda.amp import GradScaler
 from torch import autocast
-
 logger = get_logger()
 import sys
-sys.path.insert(0, '/path/to/your/local/folder')
-
 from utils.seed import set_seed
 set_seed()
 SEED = 42
 
-# TODO Fix bug for cn/en dataset: missing rerank column error - breaks at 'context' list comprehension
+
 def collate(batch):
     query = [item['query'] for item in batch]
     context = [item['rerank'] for item in batch]
@@ -146,7 +143,6 @@ def measure_result(result_dict):
         re.sub(pattern, '', x) for x in hypothesis_list if not re.match(r'^\.+$', x)
         ]
 
-        # if len(x) > 10 else 'placeholder' 
     reference_list = [
         re.sub(pattern, '', x) for x in result_dict['targets']
     ] 
@@ -226,12 +222,12 @@ def train(trainer,
                 ' '.join([query[i], '<passage>', context[i][0]])
                 for i in range(len(query))
             ]
+
+            print(f"{generator_inputs=}")
     
             input_ids = tokenizer.batch_encode_plus(
                 list(generator_inputs), padding=True,  max_length=512, truncation=True, return_tensors='pt', return_token_type_ids=False).input_ids.to(device)    
 
-            # input_ids = tokenizer.batch_encode_plus(
-            #     list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device)
             label_ids = tokenizer.batch_encode_plus(
                 list(label), padding=True, return_tensors='pt', return_token_type_ids=False).input_ids.to(device)
 
@@ -323,12 +319,7 @@ def evaluate(trainer, eval_lang:list, batch_size=16, length_penalty=1, checkpoin
                 # max_length=2000, 
                 truncation=True, 
                 return_tensors='pt').input_ids.to(device)
-                # input_ids = tokenizer.batch_encode_plus(
-                #     list(generator_inputs),  max_length=1024, truncation=True, padding='max_length', return_tensors='pt').input_ids.to(device) #padding=True
 
-
-                # outputs = model.generate(input_ids, num_beams=3, max_length=128, early_stopping=True,
-                #                         no_repeat_ngram_size=3)
                 outputs = model.generate(
                     input_ids, 
                     num_beams=3, 
@@ -361,20 +352,17 @@ def evaluate(trainer, eval_lang:list, batch_size=16, length_penalty=1, checkpoin
 def main(**kwargs):
     train_dataset_fr, train_dataset_vi, train_dataset_en, train_dataset_cn = None, None, None, None
     retrieval_data = []
-    # langs = set(item for sublist in kwargs["eval_lang"] for item in sublist) 
+
     langs = set(kwargs["target_langs"] + kwargs["source_langs"]) if kwargs["translate_mode"] == "test" else set(item for sublist in kwargs["eval_lang"] for item in sublist) 
     if "en" in langs:
-        # train_dataset_en = pd.read_json("en_train_dataset_retrieval_generation_in_domain.json", lines=True)
+
         train_dataset_en = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_ranking_pretrain/en_{kwargs['extended_generation_dataset_fname']}")
         train_dataset_en["lang"] = "en"
-        # train_dataset_en = train_dataset_en.rename({"passages": "rerank"},  axis='columns')
-        # en_train_dataset = preprocessing.read('DAMO_ConvAI/EnDoc2BotDialogue')
+
   
     if "cn" in langs:
         train_dataset_cn = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_ranking_pretrain/cn_{kwargs['extended_generation_dataset_fname']}")
         train_dataset_cn["lang"] = "cn"
-        # train_dataset_cn = train_dataset_cn.rename({"passages": "rerank"},  axis='columns')
-        # cn_train_dataset = preprocessing.read('DAMO_ConvAI/ZhDoc2BotDialogue')
         
     if "fr" in langs:
         train_dataset_fr = preprocessing.read('DAMO_ConvAI/FrDoc2BotGeneration')
@@ -465,6 +453,7 @@ def main(**kwargs):
     print(f"{dev_dataset_copy.head(1)=}")
     preprocessing.save_to_json(dev_dataset_copy, ['query', 'positive', 'response', 'lang'] , fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
 
+    # return
     freq_df = exploration.get_freq_df(train_dataset, dev_dataset)
     exploration.plot_freq(freq_df, plot_dir=f'{kwargs["cache_dir"]}/plot', fname="freq_dist_generation.png")
 
@@ -490,8 +479,6 @@ def main(**kwargs):
     print(f"{kwargs['eval_lang']=}")
     train(trainer, eval_lang=kwargs["eval_lang"], batch_size=kwargs["per_gpu_batch_size"], accumulation_steps=kwargs["gradient_accumulation_steps"], total_epoches=10, learning_rate=1e-4, loss_log_freq=1, is_translate_test=True if kwargs["translate_mode"] == "test" else False)
     evaluate(trainer, eval_lang=kwargs["eval_lang"], length_penalty=kwargs["length_penalty"])
-    # checkpoint_path=os.path.join(trainer.model.model_dir,
-                                                #    'finetuned_model.bin')
 
 
 if __name__ == '__main__':

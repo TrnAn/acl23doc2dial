@@ -59,21 +59,17 @@ def main(**kwargs):
         'gradient_accumulation_steps'] = kwargs['full_train_batch_size'] // (
             kwargs['per_gpu_train_batch_size'] * kwargs['world_size'])
     
-    # langs = set(item for sublist in kwargs["eval_lang"] for item in sublist)
     langs = set(kwargs["target_langs"]) if kwargs["translate_mode"] == "test" else set(item for sublist in kwargs["eval_lang"] for item in sublist) 
     train_dataset_fr,  train_dataset_vi, train_dataset_en, train_dataset_cn = None, None, None, None
 
     if "en" in langs:
         train_dataset_en = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/en_{kwargs['extended_rerank_dataset_fname']}")
-        
-        # train_dataset_en["lang"]        = "en"
         train_dataset_en['output']      = train_dataset_en['output'].apply(eval)
 
     if "cn" in langs:
         train_dataset_cn = pd.read_json(f"{kwargs['cache_dir']}/DAMO_ConvAI/nlp_convai_retrieval_pretrain/cn_{kwargs['extended_rerank_dataset_fname']}")
         print(train_dataset_cn.columns)
         print(train_dataset_cn.head(1))
-        # train_dataset_cn["lang"]        = "cn"
         train_dataset_cn['output']      = train_dataset_cn['output'].apply(eval)
 
     if "fr" in langs:
@@ -100,7 +96,7 @@ def main(**kwargs):
     train_dataset_en, dev_dataset_en = preprocessing.test_split(train_dataset_en)
     train_dataset_cn, dev_dataset_cn = preprocessing.test_split(train_dataset_cn)
 
-        # add machine translated en -> fr, vi queries to train set
+     # add machine translated en -> fr, vi queries to train set
     if kwargs["translate_mode"] == "train": 
         pipeline_step = 'rerank'
         train_dataset_vi = add_translation2trainset(train_df=train_dataset_vi, lang='vi', pipeline_step=pipeline_step, dir=kwargs["cache_dir"])
@@ -144,6 +140,7 @@ def main(**kwargs):
     train_dataset   = tmp_df[:len(train_dataset)]
     dev_dataset     = tmp_df[len(train_dataset):]
 
+    # ensure equal dataset sizes
     if kwargs["equal_dataset_size"]:
         train_dataset    = preprocessing.get_equal_dataset_size_by_lang(train_dataset)
         dev_dataset      = preprocessing.get_equal_dataset_size_by_lang(dev_dataset)

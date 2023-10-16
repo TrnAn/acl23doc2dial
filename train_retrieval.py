@@ -94,8 +94,6 @@ def main(**kwargs):
         dev_dataset         = preprocessing.get_equal_dataset_size_by_lang(dev_dataset)
         save_dev_dataset    = preprocessing.get_equal_dataset_size_by_lang(save_dev_dataset)
 
-    # preprocessing.save_to_json(save_dev_dataset, save_dev_dataset.columns, fname=kwargs["eval_input_file"], pdir=kwargs["cache_dir"])
-
     parent_dir = "all_passages/lang_token" if kwargs["lang_token"] else "all_passages"
     all_passages = []
     translated_passages = []
@@ -137,15 +135,13 @@ def main(**kwargs):
 
     trainer.train(
         batch_size=128,
-        total_epoches=7,
+        total_epoches=50,
         accumulation_steps=kwargs["gradient_accumulation_steps"],
-        loss_log_freq=1
-        # per_gpu_batch_size=args.per_gpu_batch_size,
-    )
+        loss_log_freq=1    
+        )
     
     trainer.evaluate()
     
-    # TODO add en-vi en-fr in case of translate-train
     extended_lang = langs - set(["fr", "vi"])
     if len(extended_lang) > 0:
         for lang_tag in extended_lang:
