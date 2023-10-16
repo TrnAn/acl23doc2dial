@@ -2,50 +2,61 @@
 ## Project Structure
 ```bash
 .
-├── all_passages
-├── args.txt                      # [deprecated] storing arguments to pass to slurm_script.sh 
-├── cheatsheet.md
-├── data_exploration              # data analysis & exploration scripts
-│   ├── dummy                     # storing dummy data
-│   └── error_anaylsis.py         # executing an (extensive) error analysis on all results
-├── inference_generation.py
-├── inference_rerank.py
-├── inference_retrieval.py
-├── modelscope                    
-├── requirements.txt              
-├── run.sh                        # run experiments /wo extended datasets: fr, vn
-├── run_ext.sh                    # run experiments /w extended datasets: en, cn
-├── slurm_script_kwargs.sh        # commit slurm job
-├── train_generation.py           
-├── train_rerank.py
-├── train_retrieval.py
-└── utils                         # aux functions for data analysis & data preprocessing
-    ├── data_exploration.py
-    └── preprocessing.py
+│   cheatsheet.md                                         # cheatsheet with example commands to start experiments
+│   cn_train_dataset_retrieval_generation_hn.json         # preprocesses Chinese data containing hard negatives, i.e., BM25
+│   environment.yml                                       # set up env
+│   en_train_dataset_retrieval_generation_hn.json         # preprocesses English data containing hard negatives, i.e., BM25
+│   en_train_dataset_retrieval_generation_in_domain.json  
+│   inference_domain_clf.py
+│   inference_generation.py
+│   inference_rerank.py
+│   inference_retrieval.py
+│   length_penalty_experiments.py                         # experiment on various length penalties
+│   pipeline.py                                           # pipeline script to start: retrieval, rerank, generation for training and inference
+│   requirements.txt                                      # set up env
+│   slurm_script_kwargs_pipeline.sh                       # SLURM script to commit job
+│   train_domain_clf.py                                   # train script: retrieval with an additional domain classification step
+│   train_generation.py
+│   train_rerank.py
+│   train_retrieval.py
+│   translate_test.py
+│   translate_train.py
+│
+├───all_passages                                          # knowledge passages
+│   │
+│   └───lang_token                                        # knowledge passages with prepended language token
+|
+├───data_exploration                                      # error analysis scripts
+│
+├───metrics                         
+│   │   q2.py                                             # script for mQ2 metric
+│   └───evaluation_sheets                                 # mQ2 metric vs human assessment sheets
+│
+├───models                                                # contains document_grounded_dialog_domain_clf_trainer
+├───modelscope                                            # modelscope models, including re2g
+└───utils                                                 # aux functions
 ```
+
 
 ## `acl23doc2dial` Experiments
 
 ### Start experiments
 
   ```shell
-  Usage: slurm_script_kwargs.sh [OPTIONS]
+  Usage: slurm_script_kwargs_pipeline.sh [OPTIONS]
 
   Options:
-    --extended                  Enable usage of extended datasets: en + cn
-    --lang_token                Enable usage of additional language token <lang> 
-    --per_gpu_batch_size        Specify batch size that fits into given GPU VRAM
-    --fname                     Specify the cache directory and dev set filename (i.e., dev_$fname.json)
-    --user                      Specify user (used to specify paths)
-    --only_train                Toggle if only training scripts shall be running
-    --only_inference            Toggle if only inference scripts shall be running
-    --only_english              If extended is set to 1; only add English dataset to experimental setting, add both en + cn otherwise
-    --only_chinese              If extended is set to 1; only add Chinese dataset to experimental setting, add both en + cn otherwise
+    --apply_dclf                add domain classification step
+    --length_penalty            set a length penalty, defaults to 1
+    --add_n_hard_negatives      add number of hard negatives per instance 
+    --target_langs              set target languages for MT experiments
+    --source_langs              set source languages for MT experiments
+    --per_gpu_batch_size        set batch size per gpu
+    --fname                     set cache dir and dev set filename
+    --eval_lang                 set evaluation language(s)
+    --translate_mode            set translation mode; i.e., train: translate-train, test: translate-test
+    --lang_token                add language token
     
   Example usage
-  # \w language token and \wo extended datasets, i.e., only the French and Vietnamese datasets
-  bash slurm_script_kwargs.sh --extended 0 --lang_token 1 --fname lang_token --per_gpu_batch_size 1
-  
-  # \wo language token and \w extended datasets, i.e., adding the English and Chinese datasets
-  bash slurm_script_kwargs.sh --extended 1 --lang_token 0 --fname ext_no_lang_token --per_gpu_batch_size 1
+  - see cheatsheet.md
   ```
