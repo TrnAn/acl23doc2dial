@@ -2,7 +2,6 @@ from models.document_grounded_dialog_domain_clf_trainer import DocumentGroundedD
 from utils.preprocessing import get_args
 from transformers import AutoConfig
 import json
-from modelscope.models import Model
 from modelscope.hub.snapshot_download import snapshot_download
 import os
 import re
@@ -16,10 +15,8 @@ from modelscope.trainers.nlp.document_grounded_dialog_retrieval_trainer import \
 def main(**kwargs):
     langs = get_unique_langs(kwargs["eval_lang"])
 
-
     if kwargs["translate_mode"] == "test":
         retrieval_fnames = [f"ttest_{src_lang}2{kwargs['target_langs'][0]}.json" for src_lang in kwargs['source_langs']]
-        print(retrieval_fnames)
         retrieval_paths  = [os.path.join(kwargs["cache_dir"], retrieval_fname) for retrieval_fname in retrieval_fnames]
     else:
         retrieval_paths  = [f'{kwargs["cache_dir"]}/{kwargs["eval_input_file"]}']
@@ -78,7 +75,7 @@ def main(**kwargs):
 
 
     labels = sorted(pd.DataFrame(eval_dataset)["domain"].unique())
-    print(f"{labels=}")
+
     adapt_args = {
         "num_classes": len(labels), 
         "labels": labels
@@ -87,8 +84,7 @@ def main(**kwargs):
 
     clf_model = XLMRobertaDomainClfHead(config=config, adapt_args=adapt_args, model=new_model)
     dev_dataset = pd.DataFrame(eval_dataset)
-    # dev_dataset["negative"] = None
-    print(dev_dataset.columns)
+
     trainer = DocumentGroundedDialogDomainClfTrainer(
         model           = copy.deepcopy(clf_model), 
         tokenizer_dir   = tokenizer_dir,

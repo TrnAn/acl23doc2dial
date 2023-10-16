@@ -1,16 +1,10 @@
-import torch
-import os
 import json
-from tqdm import tqdm
 from modelscope.models import Model
 from modelscope.models.nlp import DocumentGroundedDialogRerankModel
 from modelscope.pipelines.nlp import DocumentGroundedDialogRerankPipeline
 from modelscope.preprocessors.nlp import \
     DocumentGroundedDialogRerankPreprocessor
-from modelscope.trainers.nlp.document_grounded_dialog_rerank_trainer import \
-    DocumentGroundedDialogRerankTrainer
 from typing import Union
-import argparse
 from utils.seed import set_seed
 from utils.preprocessing import get_args, get_unique_langs
 set_seed()
@@ -74,7 +68,6 @@ def main(**kwargs):
     })
     
     langs = get_unique_langs(kwargs["eval_lang"])
-    # kwargs["eval_lang"] = kwargs["eval_lang"][0]
 
     model = Model.from_pretrained(model_dir, **kwargs)
     mypreprocessor = DocumentGroundedDialogRerankPreprocessor(
@@ -82,11 +75,6 @@ def main(**kwargs):
 
     pipeline_ins = myDocumentGroundedDialogRerankPipeline(
         model=model, preprocessor=mypreprocessor, **kwargs)
-
-    # file_in = open(f'./{kwargs["cache_dir"]}/input.jsonl', 'r', encoding="utf-8-sig")
-    # all_querys = []
-    # for every_query in file_in:
-    #     all_querys.append(json.loads(every_query))
 
     passage_to_id = {}
     ptr = -1
@@ -133,27 +121,14 @@ def main(**kwargs):
         output_list = []
         positive_pids_list = []
         responses_list = []
-        # ptr = -1
 
-        # for ptr, x in tqdm(enumerate(all_querys)):
+
         for idx, (query, language, all_candidates, target, response) in enumerate(zip(queries, languages, retrieval_result, retrieval_targets, responses)):
-            # ptr += 1
-            # now_id = str(ptr)
-            # now_input = x
-            # now_positive = now_input["positive"]
             now_wikipedia = []
             now_passages = []
 
             if language not in lang:
                 continue
-            
-            # retrieval_idx = retrieval_targets.index(now_positive)
-        
-            # all_candidates = retrieval_result[ptr]
-            # all_candidates = retrieval_result[retrieval_idx]
-            # target = retrieval_targets[ptr]
-            # target = retrieval_targets[retrieval_idx]
-            
             
             for every_passage in all_candidates:
                 get_pid = passage_to_id[every_passage.strip()]
@@ -170,13 +145,7 @@ def main(**kwargs):
             lang_list.append(language)
             positive_pids_list.append(json.dumps([get_positive_pid]))
             responses_list.append(response)
-            # input_list.append(now_input['query'])
-            # passages_list.append(str(now_passages))
-            # ids_list.append(now_id)
-            # output_list.append(str(now_output))
-            # lang_list.append(now_input["lang"])
-            # positive_pids_list.append(json.dumps([get_positive_pid]))
-        
+    
 
         evaluate_dataset = {'input': input_list, 'id': ids_list, 'passages': passages_list, 'output': output_list,
                             'positive_pids': positive_pids_list, 'langs': lang_list, 'responses': responses_list}
