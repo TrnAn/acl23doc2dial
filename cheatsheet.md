@@ -1,14 +1,7 @@
 # Le Cheatsheet
-- shared folder
-    - > /storage/ukp/shared/shared_daheim_tran 
 - set gpu vram:
     - `#SBATCH --constraint="gpu_model:a100|gpu_model:v100|gpu_model:a6000|gpu_model:a180|gpu_model:titanrtx"`
 ---
-
-## Run as `SBATCH`
-```bash
-
-```
 
 ## Start `SRUN` 
 ```bash
@@ -17,105 +10,46 @@ srun --qos gpu-athene --gres=gpu:1 --constraint="gpu_model:a100|gpu_model:v100|g
 srun -p testing --gres=gpu:1 --mem-per-cpu=24g --pty bash
 ```
 
-## Run as `SRUN` 
-
-```bash
-user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
-mode=train &&\
-seed=42 &&\
-fname=tst_pipeline &&\
-dev_dir=dev_$fname.json &&\
-pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --translate-mode $mode --batch-accumulation --per-gpu-batch-size 8 --cache-dir=$fname --lang-token --eval-input-file=$dev_dir --eval-lang "[['fr', 'vi', 'en'], ['fr', 'vi'], ['fr'], ['vi'], ['en']]" --target-langs "['fr', 'vi']" --source-lang "en" &&\
-echo "pipeline finished..." &&\
-popd
-
-
-user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
-mode=domain_clf &&\
-seed=42 &&\
-fname=tst_pipeline &&\
-dev_dir=dev_$fname.json &&\
-pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-python /ukp-storage-1/$user/acl23doc2dial/train_domain_clf.py --batch-accumulation --per-gpu-batch-size 32 --cache-dir=$fname --eval-input-file=$dev_dir --eval-lang "[['fr', 'vi'], ['fr'], ['vi']]" --target-langs "[]" --source-lang "[]" &&\
-popd
-```
+## Run as `SBATCH` 
 
 ```sh
-bash slurm_script_kwargs_pipeline.sh --fname ttrain_2epochs --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 2
-
-bash slurm_script_kwargs_pipeline.sh --fname ttrain_2epochs --translate_mode train --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi', 'en'], ['fr', 'vi'], ['fr'], ['vi'], ['en']]" --target_langs "['fr', 'vi']" --source_langs "['en']" --length_penalty 2
-
-bash slurm_script_kwargs_pipeline.sh --fname ttest_improved --translate_mode test --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "['en']" --source_langs "['fr', 'vi']" --source_langs "['en']"
-
-bash slurm_script_kwargs_pipeline.sh --fname translate_test_lang_token_lp --translate_mode test --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "['en']" --source_langs "['fr', 'vi']"
-
-bash slurm_script_kwargs_pipeline.sh --fname all_lang_token --lang_token 1 --per_gpu_batch_size 8 --eval_lang "[['fr','vi', 'en'], ['fr','vi'], ['fr'], ['vi'], ['en']]" --target_langs "[]" --source_langs "[]"
-bash slurm_script_kwargs_pipeline.sh --fname cn_vi_lang_token --lang_token 1 --per_gpu_batch_size 8 --eval_lang "[['cn','vi'], ['vi']]" --target_langs "[]" --source_langs "[]"
-bash slurm_script_kwargs_pipeline.sh --fname en_fr_lang_token --lang_token 1 --per_gpu_batch_size 8 --eval_lang "[['fr','en'], ['fr']]" --target_langs "[]" --source_langs "[]"
-bash slurm_script_kwargs_pipeline.sh --equal_dataset_size 1 --fname en_no_lang_token_eq --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr','en'], ['fr']]" --target_langs "[]" --source_langs "[]"
-bash slurm_script_kwargs_pipeline.sh --equal_dataset_size 1 --fname fr_vi_en_no_lang --lang_token 0 --per_gpu_batch_size 1 --eval_lang "[['fr','vi','en'], ['fr','vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]"
-bash slurm_script_kwargs_pipeline.sh  --fname fr_vi_no_lang --lang_token 0 --per_gpu_batch_size 8 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]"
-bash slurm_script_kwargs_pipeline.sh --fname retrieval50 --lang_token 1 --per_gpu_batch_size 8 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]"
-bash slurm_script_kwargs_pipeline.sh --fname domain_clf_lang_token  --lang_token 1 --per_gpu_batch_size 8 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]"
-
-bash slurm_script_kwargs_pipeline.sh --fname fr_lang --lang_token 1 --per_gpu_batch_size 8 --eval_lang "[['fr']]" --target_langs "[]" --source_langs "[]"
-bash slurm_script_kwargs_pipeline.sh --fname hard_negatives_no_fn --add_n_hard_negatives 1 --lang_token 1 --per_gpu_batch_size 8 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]"
-bash slurm_script_kwargs_pipeline.sh --fname hard_negatives2 --add_n_hard_negatives 2 --lang_token 1 --per_gpu_batch_size 8 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]"
-
-bash slurm_script_kwargs_pipeline.sh --fname hard_negatives8 --add_n_hard_negatives 8 --lang_token 1 --per_gpu_batch_size 8 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]"
-
-# =============================================
-
-# experiment 0
+# experiment baseline using: fr, vi
 bash slurm_script_kwargs_pipeline.sh --lang_token 0 --fname 0_baseline --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 1
 
-# experiment 1
-bash slurm_script_kwargs_pipeline.sh --lang_token 0 --fname 1_baseline_lp --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 2
+# finetune on languages separately
+bash slurm_script_kwargs_pipeline.sh --lang_token 0 --fname 0_baseline_vi --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 1
+bash slurm_script_kwargs_pipeline.sh --lang_token 0 --fname 0_baseline_fr --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['fr']]" --target_langs "[]" --source_langs "[]" --length_penalty 1
 
-# experiment 2
-bash slurm_script_kwargs_pipeline.sh --lang_token 1 --fname 1_baseline_lt --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 2
+# start language token experiment
+bash slurm_script_kwargs_pipeline.sh --lang_token 1 --fname 1_baseline_lt_old --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 1
 
-# translate-train TRAIN
-bash slurm_script_kwargs_pipeline.sh --fname ttrain_2epochs_nlt --translate_mode train --lang_token 0 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi', 'en'], ['fr', 'vi'], ['fr'], ['vi'], ['en']]" --target_langs "['fr', 'vi']" --source_langs "['en']" --length_penalty 1
+# start translate-train experiment: use MT data for finetuning
+bash slurm_script_kwargs_pipeline.sh --fname ttrain_2epochs_nlt --translate_mode train --lang_token 0 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi', 'en'], ['fr', 'vi'], ['fr'], ['vi']]" --target_langs "['fr', 'vi']" --source_langs "['en']" --length_penalty 1
 
-# translate-train INFERENCE
-bash slurm_script_kwargs_pipeline.sh --fname ttrain_2epochs --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 2
+# continue to train translate-train wo/ MT data
+bash slurm_script_kwargs_pipeline.sh --fname ttrain_2epochs_nlt --lang_token 0 --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "['fr', 'vi']" --source_langs "['en']" --length_penalty 1
 
-# translate-test
-bash slurm_script_kwargs_pipeline.sh --fname ttest --translate_mode test --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "['en']" --source_langs "['fr', 'vi']" --length_penalty 2
+# start translate-test experiment
+bash slurm_script_kwargs_pipeline.sh --fname ttest_lt --translate_mode test --lang_token 1 --per_gpu_batch_size 1 --eval_lang "[['fr','vi'], ['fr'], ['vi']]" --target_langs "['en']" --source_langs "['fr', 'vi']" --length_penalty 1
+
+# start domain clf experiment
+bash slurm_script_kwargs_pipeline.sh --apply_dclf 1 --lang_token 0 --fname domain_clf_10epochs --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 1
+
+# IN-BATCH NEGATIVES EXPERIMENT
+bash slurm_script_kwargs_pipeline.sh --lang_token 0 --fname 0_baseline_2hn --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 1 --add_n_hard_negatives 1
+bash slurm_script_kwargs_pipeline.sh --lang_token 0 --fname 0_baseline_4hn --batch_accumulation --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 1 --add_n_hard_negatives 3
+bash slurm_script_kwargs_pipeline.sh --lang_token 0 --fname 0_baseline_6hn --add_n_hard_negatives 5 --batch_accumulation  --per_gpu_batch_size 1 --eval_lang "[['fr', 'vi'], ['fr'], ['vi']]" --target_langs "[]" --source_langs "[]" --length_penalty 1 
 
 ```
 
-
+## Start `SRUN` Experiments
+### $mQ^2$ metric experiment on baseline
 ```bash
-seed=42 &&\
-user=tran &&\
-fname=1_baseline_lt &&\
-dev_dir=dev_$fname.json &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\
-pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-export PYTHONHASHSEED=$seed &&\
-export SEED_VALUE=$seed&&\
-mkdir -p ./$fname/ &&\
-script -q -c "python /ukp-storage-1/'$user'/acl23doc2dial/pipeline.py  --lang-token --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --eval-input-file "$dev_dir"  --eval-lang  \"[['fr', 'vi'], ['fr'], ['vi']]\" --target-langs '[]' --source-langs '[]' --length-penalty 2" | tee -a ./$fname/log_output.txt &&\
-echo "train_rerank finished..." &&\
-popd
-
+# for fr+vi
 seed=42 &&\
 user=tran &&\
 fname=0_baseline &&\
 dev_dir=dev_$fname.json &&\
-
-
 source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
 conda activate acl23doc2dial &&\
 pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
@@ -123,119 +57,55 @@ export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
 export PYTHONHASHSEED=$seed &&\
 export SEED_VALUE=$seed&&\
 mkdir -p ./$fname/ &&\
-script -q -c "python /ukp-storage-1/'$user'/acl23doc2dial/pipeline.py --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --eval-input-file "$dev_dir"  --eval-lang  \"[['fr', 'vi'], ['fr'], ['vi']]\" --target-langs '[]' --source-langs '[]' --length-penalty 1" | tee -a ./$fname/log_output.txt &&\
+script -q -c "python /ukp-storage-1/'$user'/acl23doc2dial/metrics/q2.py" | tee -a ./$fname/log_output.txt &&\
 echo "train_rerank finished..." &&\
 popd
-````
 
+# for French subset
 user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
-seed=42 &&\
-fname=ttrain_tokens &&\
+fname=0_baseline &&\
 dev_dir=dev_$fname.json &&\
+source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
+conda activate acl23doc2dial &&\
 pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
 export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128  &&\
-python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --lang-token --translate-mode train --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --eval-input-file $dev_dir --eval-lang "[['fr','vi'], ['fr'], ['vi']]" --target-langs "['fr','vi']" --source-langs "['en']" &&\
-echo "pipeline finished..." &&\
+export PYTHONHASHSEED=$seed &&\
+export SEED_VALUE=$seed&&\
+mkdir -p ./$fname/ &&\
+script -q -c "python /ukp-storage-1/'$user'/acl23doc2dial/metrics/q2.py --eval-lang \"['fr']\" --sample-size 50" | tee -a ./$fname/log_output.txt &&\
 popd
 
 
+# for Vietnamese subset
 user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
-seed=42 &&\
-fname=tst_negative_duplicates &&\
+fname=0_baseline &&\
 dev_dir=dev_$fname.json &&\
+source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
+conda activate acl23doc2dial &&\
 pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
 export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128  &&\
-python /ukp-storage-1/$user/acl23doc2dial/train_retrieval.py --n-hard-negatives 1 --lang-token --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --eval-input-file $dev_dir --eval-lang "[['fr','vi'], ['fr'], ['vi']]" --target-langs "[]" --source-langs "[]" &&\
-echo "pipeline finished..." &&\
+export PYTHONHASHSEED=$seed &&\
+export SEED_VALUE=$seed&&\
+mkdir -p ./$fname/ &&\
+script -q -c "python /ukp-storage-1/'$user'/acl23doc2dial/metrics/q2.py --eval-lang \"['vi']\" --sample-size 50" | tee -a ./$fname/log_output.txt &&\
 popd
 
+```
 
-user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
+### Length Penalty Experiment
+```bash
 seed=42 &&\
-fname=translate_test_lang_token_lp &&\
+user=tran &&\
+fname=0_baseline &&\
 dev_dir=dev_$fname.json &&\
+source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
+conda activate acl23doc2dial &&\
 pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
 export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128  &&\
-python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --lang-token --translate-mode test --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --eval-input-file $dev_dir --eval-lang "[['fr','vi'], ['fr'], ['vi']]" --target-langs "['en']" --source-langs "['fr','vi']" &&\
-echo "pipeline finished..." &&\
+export PYTHONHASHSEED=$seed &&\
+export SEED_VALUE=$seed&&\
+mkdir -p ./$fname/ &&\
+script -q -c "python /ukp-storage-1/'$user'/acl23doc2dial/length_penalty_experiments.py" | tee -a ./$fname/log_output_lp.txt &&\
+echo "lp experiments finished..." &&\
 popd
-
-
-user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
-mode=test &&\
-seed=42 &&\
-fname=all_lang_token &&\
-dev_dir=dev_$fname.json &&\
-pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128  &&\
-python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --lang-token --eval-input-file $dev_dir --eval-lang "[['fr','vi', 'en'], ['fr','vi'], ['fr'], ['vi'], ['en']]" --target-langs "[]" --source-langs "[]" &&\
-echo "pipeline finished..." &&\
-popd
-
-
-user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
-seed=42 &&\
-fname=domain_clf &&\
-dev_dir=dev_$fname.json &&\
-pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-python /ukp-storage-1/$user/acl23doc2dial/inference_rerank.py --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --eval-input-file $dev_dir --eval-lang "[['fr','vi'], ['fr'], ['vi']]" --target-langs "[]" --source-langs "[]" &&\
-echo "pipeline finished..." &&\
-popd
-
-user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
-seed=42 &&\
-fname=fr_vi_no_lang &&\
-dev_dir=dev_$fname.json &&\
-pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-python /ukp-storage-1/$user/acl23doc2dial/inference_rerank.py --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --eval-input-file $dev_dir --eval-lang "[['fr','vi']]" --target-langs "[]" --source-langs "[]" &&\
-echo "pipeline finished..." &&\
-popd
-
-
-
-user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
-mode=test &&\
-seed=42 &&\
-fname=en_fr_lang_token_eq &&\
-dev_dir=dev_$fname.json &&\
-pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:128 &&\
-python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --equal-dataset-size 1 --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --lang-token --eval-input-file $dev_dir --eval-lang "[['en','fr'], ['fr']]" --target-langs "[]" --source-langs "[]" > "$fname".out.txt &&\
-echo "pipeline finished..." &&\
-popd
-
-
-user=tran &&\
-source /ukp-storage-1/$user/miniconda3/etc/profile.d/conda.sh &&\
-conda activate acl23doc2dial &&\ 
-mode=test &&\
-seed=42 &&\
-fname=cn_vi_lang_token_eq &&\
-dev_dir=dev_$fname.json &&\
-pushd /ukp-storage-1/$user/acl23doc2dial/ &&\
-export HOME=/ukp-storage-1/$user/acl23doc2dial/ &&\
-export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:256 &&\
-python /ukp-storage-1/$user/acl23doc2dial/pipeline.py --equal-dataset-size 1 --batch-accumulation --per-gpu-batch-size 1 --cache-dir $fname --lang-token --eval-input-file $dev_dir --eval-lang "[['vi','cn'], ['cn'], ['vi']]" --target-langs "[]" --source-langs "[]" > "$fname".out.txt &&\
-echo "pipeline finished..." &&\
-popd
+```
